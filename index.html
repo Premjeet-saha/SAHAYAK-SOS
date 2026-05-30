@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Crisis Command Center - Bhubaneswar</title>
+    <style>
+      /* Full screen map layout */
+      #map { height: 100vh; width: 100%; }
+      body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+      
+      /* Professional Status Overlay */
+      #header-overlay {
+        position: absolute; top: 20px; left: 20px;
+        background: rgba(0, 0, 0, 0.8); color: white;
+        padding: 15px; border-left: 5px solid #ff0000;
+        border-radius: 4px; z-index: 10; pointer-events: none;
+      }
+      .emergency-ui { padding: 5px; min-width: 180px; }
+      .emergency-ui h3 { margin: 0; color: #ff4d4d; font-size: 16px; text-transform: uppercase; }
+      .emergency-ui p { margin: 10px 0 0 0; font-size: 14px; line-height: 1.4; color: #eee; }
+    </style>
+  </head>
+  <body>
+    
+    <div id="header-overlay">
+        <div class="emergency-ui">
+            <h3>📡 System: Online</h3>
+            <p id="live-status">Waiting for satellite sync...</p>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+      let map;
+      let marker;
+      let infoWindow;
+      let rescueTrail; 
+      let lastLat = 0;
+      let lastLng = 0;
+
+      function initMap() {
+        // Start view on Bhubaneswar coordinates
+        const startPos = { lat: 20.296, lng: 85.824 };
+
+        map = new google.maps.Map(document.getElementById("map"), {
+          zoom: 16,
+          center: startPos,
+          mapTypeId: 'satellite',
+          zoomControl: true,
+          mapTypeControl: true,
+          streetViewControl: true,
+          fullscreenControl: true
+        });
+
+        // Initialize the blue navigation line
+        rescueTrail = new google.maps.Polyline({
+          geodesic: true,
+          strokeColor: "#00E5FF", // Neon blue for visibility
+          strokeOpacity: 1.0,
+          strokeWeight: 4,
+          map: map
+        });
+
+        infoWindow = new google.maps.InfoWindow();
+        
+        // Start the real-time update loop
+        fetchVictimData();
+      }
+
+      function fetchVictimData() {
+        fetch('http://127.0.0.1:5000/get-victim')
+          .then(response => response.json())
+          .then(data => {
+            const currentPos = { lat: parseFloat(data.lat), lng: parseFloat(data.lng) };
+
+            // 1. Update Overlay Text
+            document.getElementById('live-status').innerText = data.status;
+
+            // 2. Manage the Bouncing Pin
+            if (!marker) {
+              marker = new google.maps.Marker({
+                position: currentPos,
+                map: map,
+                animation: google.maps.Animation.BOUNCE
+              });
+            } else {
+              marker.setPosition(currentPos);
+            }
+
+            // 3. Update the Blue Navigation Path
+            const pathArray = rescueTrail.getPath();
+            pathArray.push(new google.maps.LatLng(currentPos.lat, currentPos.lng));
+
+            // 4. Update the Message Bubble
+            infoWindow.setContent(`
+              <div style="color:#333; padding:5px;">
+                <b style="color:red;">REPORT:</b><br>${data.status}
+              </div>
+            `);
+            infoWindow.open(map, marker);
+            
+            // 5. AUTO-NAVIGATE: Fly the camera if they move
+            if (currentPos.lat !== lastLat || currentPos.lng !== lastLng) {
+                map.panTo(currentPos);
+                lastLat = currentPos.lat;
+                lastLng = currentPos.lng;
+            }
+
+            // Loop every 3 seconds
+            setTimeout(fetchVictimData, 3000);
+          })
+          .catch(error => {
+            console.log("Re-connecting to Python Brain...");
+            setTimeout(fetchVictimData, 5000);
+          });
+      }
+    </script>
+    
+    <script async defer
+      src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD7iQ-HU7dW0KExSY1Qa8HKJeTGZcXZXo0&callback=initMap">
+    </script>
+  </body>
+</html>
