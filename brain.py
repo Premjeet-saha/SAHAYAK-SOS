@@ -19,9 +19,17 @@ def home():
 
 @app.route('/report-emergency', methods=['POST'])
 def report_emergency():
-    data = request.json
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        data = {}
+
     raw_input_payload = data.get('raw_input', '')
+    if raw_input_payload is None:
+        raw_input_payload = ''
+
     input_type = data.get('type', 'text')
+    if not isinstance(input_type, str):
+        input_type = 'text'
     
     raw_input_original = str(raw_input_payload)
     raw_input = raw_input_original.lower()
@@ -29,7 +37,7 @@ def report_emergency():
     incident_id = f"SAH-{random.randint(10000, 99999)}"
     
     incident_type = "Urgent Citizen Distress Call"
-    hazard_level = "High"
+    hazard_level = "HIGH"
     service_dispatched = "Emergency Response Police Unit & Rapid Patrol"
     people = 1
     medical = "NO"
@@ -39,7 +47,7 @@ def report_emergency():
         hazard_level = "CRITICAL"
         service_dispatched = "NDRF & State Disaster Management (SDRF)"
         people = "Multiple / Visual Threat"
-        medical = "High Probability"
+        medical = "NO"
     else:
         keyword_map = {
             # Fire & Industrial
@@ -83,7 +91,7 @@ def report_emergency():
             hazard_level = "CRITICAL"
             service_dispatched = "NDRF & State Disaster Response Force (SDRF)"
             medical = "YES"
-        elif "Cardiac" in incident_type or "Patient" in incident_type or "Trauma" in incident_type or "Injury" in incident_type or "Snake" in incident_type or "Medical" in incident_type or "Emergency" in incident_type:
+        elif "Cardiac" in incident_type or "Patient" in incident_type or "Trauma" in incident_type or "Injury" in incident_type or "Snake" in incident_type or "Medical" in incident_type:
             hazard_level = "HIGH"
             service_dispatched = "National Emergency Ambulance & Medical Response Team"
             medical = "YES"
@@ -102,8 +110,6 @@ def report_emergency():
         # Explicit medical keyword check
         if any(word in raw_input or word in raw_input_original for word in ["elderly", "maa", "bujurg", "बुजुर्ग", "injured", "medical", "chot", "चोट", "khoon", "खून", "behosh", "बेहोश", "bimar", "saanp", "सांप", "heart", "pain", "hospital", "doctor"]): 
             medical = "YES"
-            if "Police" in service_dispatched or "Patrol" in service_dispatched:
-                service_dispatched = "National Emergency Ambulance & Medical Response Team"
 
     # Priority calculation
     base_score = 30
@@ -117,7 +123,17 @@ def report_emergency():
     if medical == "YES": 
         base_score += 15
 
-    priority_score = min(int(base_score + random.randint(1, 5)), 100)
+    priority_score = min(int(base_score), 100)
+
+    lat = data.get('lat', 20.296)
+    lng = data.get('lng', 85.824)
+    try:
+        lat = float(lat)
+        lng = float(lng)
+        if not -90 <= lat <= 90 or not -180 <= lng <= 180:
+            raise ValueError
+    except (TypeError, ValueError):
+        lat, lng = 20.296, 85.824
     
     structured_data = {
         "incident_id": incident_id,
@@ -131,8 +147,8 @@ def report_emergency():
     explanation = f"SAHAYAK Intelligent Triage ({priority_score}/100): Matched category '{incident_type}' with '{hazard_level}' hazard level. Medical Status: {medical}. Routed to: {service_dispatched}."
 
     latest_incident.update({
-        "lat": data.get('lat', 20.296),
-        "lng": data.get('lng', 85.824),
+        "lat": lat,
+        "lng": lng,
         "status": f"Active Dispatch: {incident_type}",
         "priority_score": priority_score,
         "structured_data": structured_data,
