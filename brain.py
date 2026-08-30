@@ -192,10 +192,36 @@ def report_emergency():
     elif hazard_level == "Medium":
         base_score = 40
 
-    if medical == "YES": 
-        base_score += 15
+    medical_modifier = 10 if medical == "YES" else 0
 
-    priority_score = min(int(base_score), 100)
+    people_modifier = 0
+    if isinstance(people, int):
+        if people >= 10:
+            people_modifier = 15
+        elif people >= 5:
+            people_modifier = 10
+        elif people >= 2:
+            people_modifier = 5
+
+    multi_signal_modifier = 5 if len(detected_hazards) > 1 else 0
+    severe_medical_types = {
+        "Cardiac Arrest Emergency", "Unconscious Patient", "Severe Bleeding Trauma",
+        "Critical Physical Injury", "Multiple Trauma Injury", "Venomous Snake Bite"
+    }
+    severe_incident_modifier = 5 if hazard_level == "HIGH" and incident_type in severe_medical_types else 0
+
+    priority_score = max(0, min(
+        base_score + medical_modifier + people_modifier + multi_signal_modifier + severe_incident_modifier,
+        100
+    ))
+    priority_breakdown = {
+        "base_score": base_score,
+        "medical_modifier": medical_modifier,
+        "people_modifier": people_modifier,
+        "multi_signal_modifier": multi_signal_modifier,
+        "severe_incident_modifier": severe_incident_modifier,
+        "final_score": priority_score
+    }
 
     lat = data.get('lat', 20.296)
     lng = data.get('lng', 85.824)
@@ -216,7 +242,8 @@ def report_emergency():
         "resource_needed": service_dispatched,
         "detected_hazards": detected_hazards,
         "detected_medical_signals": detected_medical_signals,
-        "detected_keywords": detected_keywords
+        "detected_keywords": detected_keywords,
+        "priority_breakdown": priority_breakdown
     }
 
     explanation = f"SAHAYAK Intelligent Triage ({priority_score}/100): Matched category '{incident_type}' with '{hazard_level}' hazard level. Medical Status: {medical}. Routed to: {service_dispatched}."
