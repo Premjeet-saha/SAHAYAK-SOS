@@ -188,20 +188,20 @@
         
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
-                (pos) => sendSOS(pos.coords.latitude, pos.coords.longitude),
-                () => sendSOS(fallbackLat, fallbackLng),
+                (pos) => sendSOS(pos.coords.latitude, pos.coords.longitude, "gps"),
+                () => sendSOS(fallbackLat, fallbackLng, "demo_fallback"),
                 { timeout: 3000 }
             );
         } else {
-            sendSOS(fallbackLat, fallbackLng);
+            sendSOS(fallbackLat, fallbackLng, "demo_fallback");
         }
       }
 
-      function sendSOS(lat, lng) {
+      function sendSOS(lat, lng, locationSource) {
         fetch('http://127.0.0.1:5000/report-emergency', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lat: lat, lng: lng, raw_input: payloadData, type: currentType })
+          body: JSON.stringify({ lat: lat, lng: lng, raw_input: payloadData, type: currentType, location_source: locationSource })
         })
         .then(res => res.json())
         .then(() => {

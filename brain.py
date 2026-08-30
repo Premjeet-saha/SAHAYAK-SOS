@@ -11,7 +11,8 @@ latest_incident = {
     "status": "SAHAYAK Engine Online: Intelligent Priority Triage Active",
     "priority_score": 0,
     "structured_data": {},
-    "gemini_explanation": "Awaiting citizen emergency broadcast..."
+    "gemini_explanation": "Awaiting citizen emergency broadcast...",
+    "location_source": "demo_fallback"
 }
 
 @app.route('/')
@@ -237,6 +238,12 @@ def report_emergency():
     except (TypeError, ValueError):
         lat, lng = 20.296, 85.824
     
+    location_source = data.get('location_source', 'demo_fallback')
+    if not isinstance(location_source, str):
+        location_source = 'demo_fallback'
+    if location_source not in ('gps', 'demo_fallback'):
+        location_source = 'demo_fallback'
+    
     structured_data = {
         "incident_id": incident_id,
         "type": incident_type,
@@ -247,7 +254,8 @@ def report_emergency():
         "detected_hazards": detected_hazards,
         "detected_medical_signals": detected_medical_signals,
         "detected_keywords": detected_keywords,
-        "priority_breakdown": priority_breakdown
+        "priority_breakdown": priority_breakdown,
+        "location_source": location_source
     }
 
     explanation = f"SAHAYAK Intelligent Triage ({priority_score}/100): Matched category '{incident_type}' with '{hazard_level}' hazard level. Medical Status: {medical}. Routed to: {service_dispatched}."
@@ -258,7 +266,8 @@ def report_emergency():
         "status": f"Active Dispatch: {incident_type}",
         "priority_score": priority_score,
         "structured_data": structured_data,
-        "gemini_explanation": explanation
+        "gemini_explanation": explanation,
+        "location_source": location_source
     })
 
     return jsonify({"status": "Success", "data": latest_incident}), 200
