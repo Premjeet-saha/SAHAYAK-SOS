@@ -121,11 +121,9 @@ def report_emergency():
         if "Fire" in incident_type or "Gas" in incident_type or "Cylinder" in incident_type:
             hazard_level = "CRITICAL"
             service_dispatched = "State Fire Services & Fire Tender Units"
-            medical = "YES"
         elif "Flood" in incident_type or "Earthquake" in incident_type or "Landslide" in incident_type or "Cloudburst" in incident_type:
             hazard_level = "CRITICAL"
             service_dispatched = "NDRF & State Disaster Response Force (SDRF)"
-            medical = "YES"
         elif "Cardiac" in incident_type or "Patient" in incident_type or "Trauma" in incident_type or "Injury" in incident_type or "Snake" in incident_type or "Medical" in incident_type:
             hazard_level = "HIGH"
             service_dispatched = "National Emergency Ambulance & Medical Response Team"
