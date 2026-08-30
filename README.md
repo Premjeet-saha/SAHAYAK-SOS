@@ -32,5 +32,5 @@ Follow these steps to set up and run the project on your local machine.
 
 ### 1. Clone the Repository
 ```bash
-git clone [https://github.com/Premjeet-saha/RescueMap.git](https://github.com/Premjeet-saha/RescueMap.git)
-cd RescueMap
+git clone [https://github.com/Premjeet-saha/SAHAYAK-SOS.git](https://github.com/Premjeet-saha/SAHAYAK-SOS.git)
+cd SAHAYAK-SOS
