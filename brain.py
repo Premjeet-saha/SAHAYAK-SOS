@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import random
 import re
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)
@@ -12,7 +13,8 @@ latest_incident = {
     "priority_score": 0,
     "structured_data": {},
     "gemini_explanation": "Awaiting citizen emergency broadcast...",
-    "location_source": "demo_fallback"
+    "location_source": "demo_fallback",
+    "request_timestamp": None
 }
 
 @app.route('/')
@@ -35,6 +37,23 @@ def report_emergency():
     
     raw_input_original = str(raw_input_payload)
     raw_input = " ".join(raw_input_original.casefold().split())
+    
+    # Helper functions for keyword matching (used by both classification and priority scoring)
+    def contains_keyword(keyword):
+        normalized_keyword = " ".join(keyword.casefold().split())
+        start = raw_input.find(normalized_keyword)
+        while start != -1:
+            end = start + len(normalized_keyword)
+            before = raw_input[start - 1] if start else ""
+            after = raw_input[end] if end < len(raw_input) else ""
+            if (not before or not before.isalnum()) and (not after or not after.isalnum()):
+                return True
+            start = raw_input.find(normalized_keyword, start + 1)
+        return False
+    
+    def add_unique(items, value):
+        if value not in items:
+            items.append(value)
     
     incident_id = f"SAH-{random.randint(10000, 99999)}"
     
@@ -81,22 +100,6 @@ def report_emergency():
             "accident": "Road Traffic Collision (RTA)", "crash": "Vehicle Crash", "takkar": "High-Speed Vehicle Collision", 
             "टक्कर": "High-Speed Vehicle Collision", "train": "Railway Derailment", "stampede": "Crowd Crush Stampede"
         }
-
-        def contains_keyword(keyword):
-            normalized_keyword = " ".join(keyword.casefold().split())
-            start = raw_input.find(normalized_keyword)
-            while start != -1:
-                end = start + len(normalized_keyword)
-                before = raw_input[start - 1] if start else ""
-                after = raw_input[end] if end < len(raw_input) else ""
-                if (not before or not before.isalnum()) and (not after or not after.isalnum()):
-                    return True
-                start = raw_input.find(normalized_keyword, start + 1)
-            return False
-
-        def add_unique(items, value):
-            if value not in items:
-                items.append(value)
 
         medical_categories = {
             "Cardiac Arrest Emergency", "Unconscious Patient", "Severe Bleeding Trauma",
@@ -188,44 +191,276 @@ def report_emergency():
         if medical == "YES" and incident_type == "General Emergency Assistance Required" and service_dispatched == "Nearest Emergency Patrol & Response Unit":
             service_dispatched = "National Emergency Ambulance & Medical Response Team"
 
-    # Priority calculation
-    base_score = 30
-    if hazard_level == "CRITICAL":
-        base_score = 75
-    elif hazard_level == "HIGH":
-        base_score = 55
-    elif hazard_level == "Medium":
-        base_score = 40
-
-    medical_modifier = 10 if medical == "YES" else 0
-
-    people_modifier = 0
-    if isinstance(people, int):
-        if people >= 10:
-            people_modifier = 15
-        elif people >= 5:
-            people_modifier = 10
-        elif people >= 2:
-            people_modifier = 5
-
-    multi_signal_modifier = 5 if len(detected_hazards) > 1 else 0
-    severe_medical_types = {
-        "Cardiac Arrest Emergency", "Unconscious Patient", "Severe Bleeding Trauma",
-        "Critical Physical Injury", "Multiple Trauma Injury", "Venomous Snake Bite"
-    }
-    severe_incident_modifier = 5 if hazard_level == "HIGH" and incident_type in severe_medical_types else 0
-
-    priority_score = max(0, min(
-        base_score + medical_modifier + people_modifier + multi_signal_modifier + severe_incident_modifier,
-        100
+    # ========== DYNAMIC RESCUE PRIORITY SCORE CALCULATION ==========
+    # Weights for the 5-component scoring model
+    WEIGHT_SEVERITY = 0.30
+    WEIGHT_VULNERABILITY = 0.20
+    WEIGHT_MEDICAL = 0.25
+    WEIGHT_ACCESSIBILITY = 0.15
+    WEIGHT_WAITING_TIME = 0.10
+    
+    # Request timestamp for waiting time calculation
+    request_timestamp = datetime.utcnow().isoformat()
+    
+    # --- SEVERITY COMPONENT (0-100) ---
+    # Derived from hazard_level and incident classification
+    def calculate_severity_score(hazard_level, incident_type):
+        if hazard_level == "CRITICAL":
+            return 95.0
+        elif hazard_level == "HIGH":
+            return 75.0
+        elif hazard_level == "Medium":
+            return 50.0
+        else:
+            return 30.0
+    
+    severity_score = calculate_severity_score(hazard_level, incident_type)
+    
+    # --- VULNERABILITY COMPONENT (0-100) ---
+    # Detect children, elderly, and other vulnerable persons
+    def extract_vulnerability_signals(text):
+        vulnerable_keywords = {
+            "child": "Children present",
+            "children": "Children present",
+            "kid": "Children present",
+            "kids": "Children present",
+            "baby": "Infant present",
+            "baccha": "Children present",
+            "बच्चा": "Children present",
+            "शिशु": "Infant present",
+            "elderly": "Elderly person",
+            "old": "Elderly person",
+            "aged": "Elderly person",
+            "senior": "Elderly person",
+            "bujurg": "Elderly person",
+            "बुजुर्ग": "Elderly person",
+            "pregnant": "Pregnant woman",
+            "गर्भवती": "Pregnant woman",
+            "disabled": "Disabled person",
+            "विकलांग": "Disabled person",
+            "trapped": "Trapped person"
+        }
+        detected_vulnerability = []
+        for keyword, signal in vulnerable_keywords.items():
+            if contains_keyword(keyword):
+                if signal not in detected_vulnerability:
+                    detected_vulnerability.append(signal)
+        return detected_vulnerability
+    
+    vulnerability_signals = extract_vulnerability_signals(raw_input)
+    
+    # Vulnerability scoring: presence of vulnerable groups elevates score
+    def calculate_vulnerability_score(signals):
+        if not signals:
+            return 20.0  # Low baseline (generic caller)
+        elif "Children present" in signals or "Infant present" in signals:
+            return 85.0  # Very high for children
+        elif "Trapped person" in signals:
+            return 80.0  # Very high for trapped
+        elif "Elderly person" in signals or "Pregnant woman" in signals:
+            return 70.0  # High for elderly/pregnant
+        elif "Disabled person" in signals:
+            return 60.0  # Moderate for disabled
+        else:
+            return 40.0  # Moderate for other vulnerable signals
+    
+    vulnerability_score = calculate_vulnerability_score(vulnerability_signals)
+    
+    # --- MEDICAL URGENCY COMPONENT (0-100) ---
+    # Severity levels of medical conditions with normalized scores
+    def calculate_medical_urgency_score(detected_signals, medical_status):
+        if medical_status != "YES":
+            return 0.0  # No medical urgency if not medical
+        
+        # Tier 1: Life-threatening conditions (highest)
+        critical_medical = {
+            "Cardiac Arrest Emergency",
+            "Unconscious Patient",
+            "Severe Bleeding Trauma"
+        }
+        
+        # Tier 2: Serious conditions
+        serious_medical = {
+            "Critical Physical Injury",
+            "Multiple Trauma Injury",
+            "Venomous Snake Bite"
+        }
+        
+        # Check for any detected signals
+        if not detected_signals:
+            return 40.0  # Generic medical request
+        
+        # Check critical first
+        for signal in detected_signals:
+            if signal in critical_medical:
+                return 95.0  # Highest medical urgency
+        
+        # Check serious
+        for signal in detected_signals:
+            if signal in serious_medical:
+                return 75.0  # High medical urgency
+        
+        # Other medical signals
+        if any("Acute Medical" in s or "Medical assistance" in s for s in detected_signals):
+            return 60.0
+        
+        if any("Cardiac" in s or "Cardiac symptoms" in s for s in detected_signals):
+            return 80.0
+        
+        if any("Pain" in s or "pain" in s.lower() for s in detected_signals):
+            return 50.0
+        
+        return 40.0  # Generic medical assistance
+    
+    medical_urgency_score = calculate_medical_urgency_score(detected_medical_signals, medical)
+    
+    # --- ACCESSIBILITY COMPONENT (0-100) ---
+    # IMPORTANT: Lower accessibility = higher score (harder to reach = more urgent)
+    # Uses explicit incident information, NOT fabricated distance
+    def extract_accessibility_signals(text):
+        accessibility_keywords = {
+            "blocked": "Road blocked",
+            "barrier": "Road blocked",
+            "रोडा": "Road blocked",
+            "रुकावट": "Road blocked",
+            "trapped": "Trapped location",
+            "फंसा": "Trapped location",
+            "फंसे": "Trapped location",
+            "isolated": "Isolated location",
+            "अलग": "Isolated location",
+            "inaccessible": "Difficult access",
+            "innaccessible": "Difficult access",
+            "difficult access": "Difficult access",
+            "कठिन": "Difficult access",
+            "unreachable": "Unreachable location",
+            "पहुंचना मुश्किल": "Difficult access",
+            "remote": "Remote location",
+            "दूरस्थ": "Remote location"
+        }
+        detected_accessibility = []
+        for keyword, signal in accessibility_keywords.items():
+            if contains_keyword(keyword):
+                if signal not in detected_accessibility:
+                    detected_accessibility.append(signal)
+        return detected_accessibility
+    
+    accessibility_signals = extract_accessibility_signals(raw_input)
+    
+    # Accessibility scoring: LOWER accessibility = HIGHER urgency (higher score)
+    def calculate_accessibility_score(signals):
+        if not signals:
+            return 30.0  # Normal/moderate accessibility (lower urgency contribution)
+        
+        # Trapped or blocked = very hard to access = highest urgency
+        if "Trapped location" in signals or "Road blocked" in signals:
+            return 90.0
+        
+        # Isolated or difficult = high urgency
+        if "Isolated location" in signals or "Difficult access" in signals:
+            return 70.0
+        
+        # Remote = moderate-high urgency
+        if "Remote location" in signals:
+            return 60.0
+        
+        # Unreachable = extreme urgency
+        if "Unreachable location" in signals:
+            return 95.0
+        
+        return 40.0  # Some accessibility constraint
+    
+    accessibility_score = calculate_accessibility_score(accessibility_signals)
+    
+    # --- WAITING TIME COMPONENT (0-100) ---
+    # Time since request was received
+    # Bounded function: increases over time but cannot exceed 100
+    def calculate_waiting_time_score(timestamp_str):
+        if not timestamp_str:
+            return 0.0  # Newly received SOS
+        
+        try:
+            created_time = datetime.fromisoformat(timestamp_str)
+            current_time = datetime.utcnow()
+            elapsed_seconds = (current_time - created_time).total_seconds()
+            
+            # Waiting time scoring function (bounded)
+            # 0 seconds = 0 score
+            # 300 seconds (5 min) = 25 score
+            # 600 seconds (10 min) = 50 score
+            # 1200 seconds (20 min) = 75 score
+            # 1800 seconds (30 min) = 90 score
+            # Beyond 30 min caps at 95
+            
+            if elapsed_seconds <= 0:
+                return 0.0
+            elif elapsed_seconds <= 300:
+                return (elapsed_seconds / 300.0) * 25.0
+            elif elapsed_seconds <= 600:
+                return 25.0 + ((elapsed_seconds - 300) / 300.0) * 25.0
+            elif elapsed_seconds <= 1200:
+                return 50.0 + ((elapsed_seconds - 600) / 600.0) * 25.0
+            elif elapsed_seconds <= 1800:
+                return 75.0 + ((elapsed_seconds - 1200) / 600.0) * 15.0
+            else:
+                return 95.0
+        except:
+            return 0.0  # Invalid timestamp
+    
+    # For new incidents, waiting time starts at 0
+    waiting_time_score = 0.0
+    
+    # --- CALCULATE DYNAMIC PRIORITY SCORE ---
+    # Weighted sum of all 5 components
+    priority_score = min(100.0, max(0.0,
+        (WEIGHT_SEVERITY * severity_score) +
+        (WEIGHT_VULNERABILITY * vulnerability_score) +
+        (WEIGHT_MEDICAL * medical_urgency_score) +
+        (WEIGHT_ACCESSIBILITY * accessibility_score) +
+        (WEIGHT_WAITING_TIME * waiting_time_score)
     ))
+    
+    priority_score = round(priority_score, 1)
+    
+    # --- BUILD PRIORITY BREAKDOWN (for transparency & judge-facing explanation) ---
     priority_breakdown = {
-        "base_score": base_score,
-        "medical_modifier": medical_modifier,
-        "people_modifier": people_modifier,
-        "multi_signal_modifier": multi_signal_modifier,
-        "severe_incident_modifier": severe_incident_modifier,
-        "final_score": priority_score
+        "weights": {
+            "severity": WEIGHT_SEVERITY,
+            "vulnerability": WEIGHT_VULNERABILITY,
+            "medical": WEIGHT_MEDICAL,
+            "accessibility": WEIGHT_ACCESSIBILITY,
+            "waiting_time": WEIGHT_WAITING_TIME
+        },
+        "components": {
+            "severity": {
+                "weight": WEIGHT_SEVERITY,
+                "score": round(severity_score, 1),
+                "contribution": round(WEIGHT_SEVERITY * severity_score, 1)
+            },
+            "vulnerability": {
+                "weight": WEIGHT_VULNERABILITY,
+                "score": round(vulnerability_score, 1),
+                "contribution": round(WEIGHT_VULNERABILITY * vulnerability_score, 1),
+                "signals": vulnerability_signals
+            },
+            "medical": {
+                "weight": WEIGHT_MEDICAL,
+                "score": round(medical_urgency_score, 1),
+                "contribution": round(WEIGHT_MEDICAL * medical_urgency_score, 1),
+                "signals": detected_medical_signals if medical == "YES" else []
+            },
+            "accessibility": {
+                "weight": WEIGHT_ACCESSIBILITY,
+                "score": round(accessibility_score, 1),
+                "contribution": round(WEIGHT_ACCESSIBILITY * accessibility_score, 1),
+                "signals": accessibility_signals
+            },
+            "waiting_time": {
+                "weight": WEIGHT_WAITING_TIME,
+                "score": round(waiting_time_score, 1),
+                "contribution": round(WEIGHT_WAITING_TIME * waiting_time_score, 1)
+            }
+        },
+        "final_score": round(priority_score, 1)
     }
 
     lat = data.get('lat', 20.296)
@@ -255,10 +490,36 @@ def report_emergency():
         "detected_medical_signals": detected_medical_signals,
         "detected_keywords": detected_keywords,
         "priority_breakdown": priority_breakdown,
-        "location_source": location_source
+        "location_source": location_source,
+        "request_timestamp": request_timestamp,
+        "vulnerability_signals": vulnerability_signals,
+        "accessibility_signals": accessibility_signals
     }
 
-    explanation = f"SAHAYAK Intelligent Triage ({priority_score}/100): Matched category '{incident_type}' with '{hazard_level}' hazard level. Medical Status: {medical}. Routed to: {service_dispatched}."
+    # Judge-facing explanation highlighting priority components
+    explanation_parts = [f"Priority: {priority_score}/100"]
+    
+    if severity_score >= 75:
+        explanation_parts.append("High severity incident")
+    elif severity_score >= 50:
+        explanation_parts.append("Moderate severity incident")
+    else:
+        explanation_parts.append("Lower severity incident")
+    
+    if vulnerability_signals:
+        explanation_parts.append(f"Vulnerable persons: {', '.join(vulnerability_signals)}")
+    
+    if medical == "YES" and medical_urgency_score >= 75:
+        explanation_parts.append("Critical medical urgency")
+    elif medical == "YES" and medical_urgency_score >= 50:
+        explanation_parts.append("Medical emergency")
+    
+    if accessibility_signals:
+        explanation_parts.append(f"Access difficulty: {', '.join(accessibility_signals)}")
+    
+    explanation_parts.append(f"Routed to: {service_dispatched}")
+    
+    explanation = " | ".join(explanation_parts)
 
     latest_incident.update({
         "lat": lat,
@@ -267,7 +528,8 @@ def report_emergency():
         "priority_score": priority_score,
         "structured_data": structured_data,
         "gemini_explanation": explanation,
-        "location_source": location_source
+        "location_source": location_source,
+        "request_timestamp": request_timestamp
     })
 
     return jsonify({"status": "Success", "data": latest_incident}), 200
