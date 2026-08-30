@@ -183,6 +183,10 @@ def report_emergency():
         if detected_medical_signals:
             medical = "YES"
 
+        # Only a generic patrol route yields to an explicit medical signal; specialized hazard routes stay primary.
+        if medical == "YES" and incident_type == "General Emergency Assistance Required" and service_dispatched == "Nearest Emergency Patrol & Response Unit":
+            service_dispatched = "National Emergency Ambulance & Medical Response Team"
+
     # Priority calculation
     base_score = 30
     if hazard_level == "CRITICAL":
