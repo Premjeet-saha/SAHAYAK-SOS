@@ -25,9 +25,9 @@
       .mic-btn { width: 70px; height: 70px; border-radius: 50%; background: #f8f9fa; border: 2px solid #ced4da; font-size: 28px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: 0.3s; }
       .mic-btn.recording { background: #fee2e2; border-color: #ef4444; color: #ef4444; animation: pulse 1.5s infinite; }
       #transcription-box { background: #f8f9fa; padding: 10px; border-radius: 6px; font-size: 14px; color: #495057; font-style: italic; min-height: 40px; display: none; margin-top: 15px; border: 1px solid #ced4da;}
-      .upload-box { border: 2px dashed #ced4da; border-radius: 8px; padding: 30px 20px; text-align: center; cursor: pointer; margin-bottom: 20px; background: #f8f9fa; transition: 0.2s;}
+      .upload-box { display: block; box-sizing: border-box; border: 2px dashed #ced4da; border-radius: 8px; padding: 30px 20px; text-align: center; cursor: pointer; margin-bottom: 20px; background: #f8f9fa; transition: 0.2s; }
       .upload-box:hover { border-color: #d9534f; background: #fff5f5; }
-      #image-preview { max-width: 100%; max-height: 150px; display: none; margin-top: 15px; border-radius: 8px; border: 1px solid #ced4da; }
+      #image-preview { max-width: 100%; max-height: 150px; display: none; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ced4da; }
       @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
       .sos-button { width: 100%; padding: 18px; background: #d9534f; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; box-shadow: 0 4px 10px rgba(217, 83, 79, 0.3); }
       .sos-button:hover { background: #c9302c; }
@@ -188,20 +188,20 @@
         
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
-                (pos) => sendSOS(pos.coords.latitude, pos.coords.longitude),
-                () => sendSOS(fallbackLat, fallbackLng),
+                (pos) => sendSOS(pos.coords.latitude, pos.coords.longitude, "gps"),
+                () => sendSOS(fallbackLat, fallbackLng, "demo_fallback"),
                 { timeout: 3000 }
             );
         } else {
-            sendSOS(fallbackLat, fallbackLng);
+            sendSOS(fallbackLat, fallbackLng, "demo_fallback");
         }
       }
 
-      function sendSOS(lat, lng) {
+      function sendSOS(lat, lng, locationSource) {
         fetch('http://127.0.0.1:5000/report-emergency', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lat: lat, lng: lng, raw_input: payloadData, type: currentType })
+          body: JSON.stringify({ lat: lat, lng: lng, raw_input: payloadData, type: currentType, location_source: locationSource })
         })
         .then(res => res.json())
         .then(() => {
