@@ -1,35 +1,149 @@
-from flask import Flask, jsonify, request
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
+import random
 
 app = Flask(__name__)
 CORS(app)
 
-# Starting position: KIIT University area
-victim_data = {
-    "lat": 20.3506, 
-    "lng": 85.8135,
-    "status": "System Online: Waiting for SOS..."
+latest_incident = {
+    "lat": 20.296, "lng": 85.824,
+    "status": "SAHAYAK Engine Online: Intelligent Priority Triage Active",
+    "priority_score": 0,
+    "structured_data": {},
+    "gemini_explanation": "Awaiting citizen emergency broadcast..."
 }
 
-@app.route('/get-victim', methods=['GET'])
-def send_data():
-    return jsonify(victim_data)
+@app.route('/')
+def home():
+    return render_template('index.html')
 
 @app.route('/report-emergency', methods=['POST'])
-def receive_data():
-    global victim_data
-    data = request.get_json()
-    if data:
-        # We force these to be floats (numbers) so the Map doesn't crash
-        victim_data = {
-            "lat": float(data['lat']),
-            "lng": float(data['lng']),
-            "status": str(data['status'])
+def report_emergency():
+    data = request.json
+    raw_input_payload = data.get('raw_input', '')
+    input_type = data.get('type', 'text')
+    
+    raw_input_original = str(raw_input_payload)
+    raw_input = raw_input_original.lower()
+    
+    incident_id = f"SAH-{random.randint(10000, 99999)}"
+    
+    incident_type = "Urgent Citizen Distress Call"
+    hazard_level = "High"
+    service_dispatched = "Emergency Response Police Unit & Rapid Patrol"
+    people = 1
+    medical = "NO"
+
+    if input_type == 'image' or "base64," in raw_input_original:
+        incident_type = "Critical Infrastructure Damage / Disaster Threat"
+        hazard_level = "CRITICAL"
+        service_dispatched = "NDRF & State Disaster Management (SDRF)"
+        people = "Multiple / Visual Threat"
+        medical = "High Probability"
+    else:
+        keyword_map = {
+            # Fire & Industrial
+            "aag": "Major Fire Outbreak", "आग": "Major Fire Outbreak", "lagi hai": "Major Fire Outbreak", 
+            "jala": "Major Fire Outbreak", "धुआं": "Heavy Smoke Hazard", "dhuan": "Heavy Smoke Hazard",
+            "gas leak": "Industrial Gas Leak", "cylinder": "Cylinder Blast", "सिलेंडर": "Cylinder Blast",
+
+            # Floods & Weather
+            "flood": "Flash Flood / Waterlogging", "paani": "Flash Flood / Waterlogging", "pani": "Flash Flood / Waterlogging", 
+            "पानी": "Flash Flood / Waterlogging", "बाढ़": "Severe River Flood", "baadh": "Severe River Flood", 
+            "doob": "Submerged Area / Drowning Risk", "डूब": "Submerged Area / Drowning Risk", "cloudburst": "Cloudburst & Flash Flood",
+
+            # Earthquakes & Landslides
+            "bhookamp": "Earthquake Tremors", "bhukamp": "Earthquake Tremors", "भूकंप": "Earthquake Tremors", 
+            "dharti hil": "Earthquake Tremors", "landslide": "Mountain Landslide", "भूस्खलन": "Mountain Landslide", 
+
+            # Medical & Health
+            "heart attack": "Cardiac Arrest Emergency", "behosh": "Unconscious Patient", "बेहोश": "Unconscious Patient", 
+            "khoon": "Severe Bleeding Trauma", "खून": "Severe Bleeding Trauma", "chot": "Critical Physical Injury", 
+            "चोट": "Critical Physical Injury", "injured": "Multiple Trauma Injury", "bimar": "Acute Medical Emergency",
+            "snake bite": "Venomous Snake Bite", "सांप": "Venomous Snake Bite", "saanp": "Venomous Snake Bite",
+
+            # Accidents & Public Safety
+            "accident": "Road Traffic Collision (RTA)", "crash": "Vehicle Crash", "takkar": "High-Speed Vehicle Collision", 
+            "टक्कर": "High-Speed Vehicle Collision", "train": "Railway Derailment", "stampede": "Crowd Crush Stampede"
         }
-        print(f"🚀 SOS RECEIVED: {victim_data['status']}")
-        return jsonify({"status": "success"}), 200
-    return jsonify({"status": "error"}), 400
+
+        matched = False
+        for keyword, official_type in keyword_map.items():
+            if keyword in raw_input or keyword in raw_input_original:
+                incident_type = official_type
+                matched = True
+                break 
+
+        # Intelligent Resource & Service Routing (Without dial numbers)
+        if "Fire" in incident_type or "Gas" in incident_type or "Cylinder" in incident_type:
+            hazard_level = "CRITICAL"
+            service_dispatched = "State Fire Services & Fire Tender Units"
+            medical = "YES"
+        elif "Flood" in incident_type or "Earthquake" in incident_type or "Landslide" in incident_type or "Cloudburst" in incident_type:
+            hazard_level = "CRITICAL"
+            service_dispatched = "NDRF & State Disaster Response Force (SDRF)"
+            medical = "YES"
+        elif "Cardiac" in incident_type or "Patient" in incident_type or "Trauma" in incident_type or "Injury" in incident_type or "Snake" in incident_type or "Medical" in incident_type or "Emergency" in incident_type:
+            hazard_level = "HIGH"
+            service_dispatched = "National Emergency Ambulance & Medical Response Team"
+            medical = "YES"
+        elif not matched and len(raw_input.strip()) > 3:
+            incident_type = "General Emergency Assistance Required"
+            hazard_level = "Medium"
+            service_dispatched = "Nearest Emergency Patrol & Response Unit"
+
+        # People count extraction
+        if any(w in raw_input or w in raw_input_original for w in ["10", "दस", "dasa"]): people = 10
+        elif any(w in raw_input or w in raw_input_original for w in ["5", "पांच", "panch"]): people = 5
+        elif any(w in raw_input or w in raw_input_original for w in ["2", "दो", "do"]): people = 2
+        elif any(w in raw_input or w in raw_input_original for w in ["3", "तीन", "teen"]): people = 3
+        elif any(w in raw_input or w in raw_input_original for w in ["4", "चार", "char"]): people = 4
+        
+        # Explicit medical keyword check
+        if any(word in raw_input or word in raw_input_original for word in ["elderly", "maa", "bujurg", "बुजुर्ग", "injured", "medical", "chot", "चोट", "khoon", "खून", "behosh", "बेहोश", "bimar", "saanp", "सांप", "heart", "pain", "hospital", "doctor"]): 
+            medical = "YES"
+            if "Police" in service_dispatched or "Patrol" in service_dispatched:
+                service_dispatched = "National Emergency Ambulance & Medical Response Team"
+
+    # Priority calculation
+    base_score = 30
+    if hazard_level == "CRITICAL":
+        base_score = 75
+    elif hazard_level == "HIGH":
+        base_score = 55
+    elif hazard_level == "Medium":
+        base_score = 40
+
+    if medical == "YES": 
+        base_score += 15
+
+    priority_score = min(int(base_score + random.randint(1, 5)), 100)
+    
+    structured_data = {
+        "incident_id": incident_id,
+        "type": incident_type,
+        "hazard_level": hazard_level,
+        "people_involved": people,
+        "medical_emergency": medical,
+        "resource_needed": service_dispatched
+    }
+
+    explanation = f"SAHAYAK Intelligent Triage ({priority_score}/100): Matched category '{incident_type}' with '{hazard_level}' hazard level. Medical Status: {medical}. Routed to: {service_dispatched}."
+
+    latest_incident.update({
+        "lat": data.get('lat', 20.296),
+        "lng": data.get('lng', 85.824),
+        "status": f"Active Dispatch: {incident_type}",
+        "priority_score": priority_score,
+        "structured_data": structured_data,
+        "gemini_explanation": explanation
+    })
+
+    return jsonify({"status": "Success", "data": latest_incident}), 200
+
+@app.route('/get-victim', methods=['GET'])
+def get_victim():
+    return jsonify(latest_incident), 200
 
 if __name__ == '__main__':
-    # use_reloader=False prevents OneDrive sync issues from crashing the server
-    app.run(debug=True, port=5000, use_reloader=False)
+    app.run(debug=True, port=5000)
