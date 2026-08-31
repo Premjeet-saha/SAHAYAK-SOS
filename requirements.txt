@@ -3,3 +3,5 @@ flask-cors
 requests
 google-generativeai
 python-dotenv
+scikit-learn
+joblib
