@@ -1,0 +1,570 @@
+{
+  "metadata": {
+    "model_version": "sahayak_triage_v1.1_grouped",
+    "created_at_utc": "2026-09-01T12:54:54.128235+00:00",
+    "random_seed": 42,
+    "split_methodology": "StratifiedGroupKFold (n_splits=5, fold=0, groups=template_id)",
+    "leakage_audit": {
+      "template_id_overlap": 0,
+      "exact_text_overlap": 0,
+      "leakage_resistant": true
+    },
+    "total_dataset_samples": 399,
+    "total_template_groups": 214,
+    "train_samples": 319,
+    "train_template_groups": 170,
+    "test_samples": 80,
+    "test_template_groups": 44,
+    "test_source_breakdown": {
+      "curated": 23,
+      "synthetic": 54,
+      "public_derived": 3
+    },
+    "human_authored_ood_test_samples": 26,
+    "feature_count": 8404,
+    "incident_classes": [
+      "Earthquake & Landslide",
+      "Flash Flood / Waterlogging",
+      "General Emergency Assistance",
+      "Major Fire Outbreak",
+      "Medical Emergency",
+      "Road Traffic Collision"
+    ],
+    "severity_classes": [
+      "CRITICAL",
+      "HIGH",
+      "LOW",
+      "MEDIUM"
+    ],
+    "medical_classes": [
+      "NO",
+      "YES"
+    ],
+    "vectorizer_config": {
+      "word_ngram_range": [
+        1,
+        2
+      ],
+      "char_ngram_range": [
+        3,
+        5
+      ],
+      "sublinear_tf": true
+    },
+    "classifier_config": {
+      "type": "LogisticRegression",
+      "C": 2.0,
+      "max_iter": 1000,
+      "class_weight": "balanced"
+    }
+  },
+  "primary_grouped_test_evaluation": {
+    "sample_count": 80,
+    "template_groups_count": 44,
+    "incident_type": {
+      "accuracy": 0.75,
+      "macro_f1": 0.7431743338856887,
+      "weighted_f1": 0.7471262362239933
+    },
+    "severity": {
+      "accuracy": 0.475,
+      "macro_f1": 0.446367192129904,
+      "weighted_f1": 0.471581525818814
+    },
+    "medical_urgency": {
+      "accuracy": 0.8125,
+      "macro_f1": 0.8100965342617503,
+      "weighted_f1": 0.8127670517486945
+    }
+  },
+  "human_authored_ood_test_evaluation": {
+    "sample_count": 26,
+    "incident_type": {
+      "accuracy": 0.7692307692307693,
+      "macro_f1": 0.77005217005217,
+      "weighted_f1": 0.7707062168600629
+    },
+    "severity": {
+      "accuracy": 0.5,
+      "macro_f1": 0.45134099616858236,
+      "weighted_f1": 0.4821396993810787
+    },
+    "medical_urgency": {
+      "accuracy": 0.8076923076923077,
+      "macro_f1": 0.7926634768740032,
+      "weighted_f1": 0.809839283523494
+    }
+  },
+  "detailed_evaluations": {
+    "primary_grouped_test": {
+      "incident_type": {
+        "target": "incident_type",
+        "sample_count": 80,
+        "accuracy": 0.75,
+        "macro_metrics": {
+          "precision": 0.7537000037000037,
+          "recall": 0.7426550573609397,
+          "f1_score": 0.7431743338856887
+        },
+        "weighted_metrics": {
+          "precision": 0.7544393106893106,
+          "recall": 0.75,
+          "f1_score": 0.7471262362239933
+        },
+        "per_class": {
+          "Earthquake & Landslide": {
+            "precision": 0.6666666666666666,
+            "recall": 0.7272727272727273,
+            "f1_score": 0.6956521739130435,
+            "support": 11
+          },
+          "Flash Flood / Waterlogging": {
+            "precision": 0.8461538461538461,
+            "recall": 0.9166666666666666,
+            "f1_score": 0.88,
+            "support": 12
+          },
+          "General Emergency Assistance": {
+            "precision": 0.7777777777777778,
+            "recall": 0.5833333333333334,
+            "f1_score": 0.6666666666666666,
+            "support": 12
+          },
+          "Major Fire Outbreak": {
+            "precision": 0.9285714285714286,
+            "recall": 0.8666666666666667,
+            "f1_score": 0.896551724137931,
+            "support": 15
+          },
+          "Medical Emergency": {
+            "precision": 0.6666666666666666,
+            "recall": 0.8235294117647058,
+            "f1_score": 0.7368421052631579,
+            "support": 17
+          },
+          "Road Traffic Collision": {
+            "precision": 0.6363636363636364,
+            "recall": 0.5384615384615384,
+            "f1_score": 0.5833333333333334,
+            "support": 13
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "Earthquake & Landslide",
+            "Flash Flood / Waterlogging",
+            "General Emergency Assistance",
+            "Major Fire Outbreak",
+            "Medical Emergency",
+            "Road Traffic Collision"
+          ],
+          "matrix": [
+            [
+              8,
+              1,
+              1,
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              11,
+              1,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              7,
+              0,
+              1,
+              4
+            ],
+            [
+              0,
+              1,
+              0,
+              13,
+              1,
+              0
+            ],
+            [
+              3,
+              0,
+              0,
+              0,
+              14,
+              0
+            ],
+            [
+              1,
+              0,
+              0,
+              0,
+              5,
+              7
+            ]
+          ]
+        }
+      },
+      "severity": {
+        "target": "severity",
+        "sample_count": 80,
+        "accuracy": 0.475,
+        "macro_metrics": {
+          "precision": 0.5322990543735225,
+          "recall": 0.4979321753515302,
+          "f1_score": 0.446367192129904
+        },
+        "weighted_metrics": {
+          "precision": 0.5522857565011821,
+          "recall": 0.475,
+          "f1_score": 0.471581525818814
+        },
+        "per_class": {
+          "CRITICAL": {
+            "precision": 0.46808510638297873,
+            "recall": 0.7096774193548387,
+            "f1_score": 0.5641025641025641,
+            "support": 31
+          },
+          "HIGH": {
+            "precision": 0.55,
+            "recall": 0.28205128205128205,
+            "f1_score": 0.3728813559322034,
+            "support": 39
+          },
+          "LOW": {
+            "precision": 1.0,
+            "recall": 0.5,
+            "f1_score": 0.6666666666666666,
+            "support": 8
+          },
+          "MEDIUM": {
+            "precision": 0.1111111111111111,
+            "recall": 0.5,
+            "f1_score": 0.18181818181818182,
+            "support": 2
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "CRITICAL",
+            "HIGH",
+            "LOW",
+            "MEDIUM"
+          ],
+          "matrix": [
+            [
+              22,
+              7,
+              0,
+              2
+            ],
+            [
+              22,
+              11,
+              0,
+              6
+            ],
+            [
+              2,
+              2,
+              4,
+              0
+            ],
+            [
+              1,
+              0,
+              0,
+              1
+            ]
+          ]
+        }
+      },
+      "medical_urgency": {
+        "target": "medical_urgency",
+        "sample_count": 80,
+        "accuracy": 0.8125,
+        "macro_metrics": {
+          "precision": 0.8093434343434344,
+          "recall": 0.8111111111111111,
+          "f1_score": 0.8100965342617503
+        },
+        "weighted_metrics": {
+          "precision": 0.8132891414141415,
+          "recall": 0.8125,
+          "f1_score": 0.8127670517486945
+        },
+        "per_class": {
+          "NO": {
+            "precision": 0.7777777777777778,
+            "recall": 0.8,
+            "f1_score": 0.7887323943661971,
+            "support": 35
+          },
+          "YES": {
+            "precision": 0.8409090909090909,
+            "recall": 0.8222222222222222,
+            "f1_score": 0.8314606741573034,
+            "support": 45
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "NO",
+            "YES"
+          ],
+          "matrix": [
+            [
+              28,
+              7
+            ],
+            [
+              8,
+              37
+            ]
+          ]
+        }
+      }
+    },
+    "human_authored_ood_test": {
+      "incident_type": {
+        "target": "incident_type (human_authored_ood)",
+        "sample_count": 26,
+        "accuracy": 0.7692307692307693,
+        "macro_metrics": {
+          "precision": 0.8152777777777778,
+          "recall": 0.7583333333333333,
+          "f1_score": 0.77005217005217
+        },
+        "weighted_metrics": {
+          "precision": 0.8048076923076923,
+          "recall": 0.7692307692307693,
+          "f1_score": 0.7707062168600629
+        },
+        "per_class": {
+          "Earthquake & Landslide": {
+            "precision": 1.0,
+            "recall": 0.6666666666666666,
+            "f1_score": 0.8,
+            "support": 3
+          },
+          "Flash Flood / Waterlogging": {
+            "precision": 0.8,
+            "recall": 0.8,
+            "f1_score": 0.8,
+            "support": 5
+          },
+          "General Emergency Assistance": {
+            "precision": 0.6666666666666666,
+            "recall": 0.6666666666666666,
+            "f1_score": 0.6666666666666666,
+            "support": 3
+          },
+          "Major Fire Outbreak": {
+            "precision": 0.8,
+            "recall": 0.6666666666666666,
+            "f1_score": 0.7272727272727273,
+            "support": 6
+          },
+          "Medical Emergency": {
+            "precision": 0.625,
+            "recall": 1.0,
+            "f1_score": 0.7692307692307693,
+            "support": 5
+          },
+          "Road Traffic Collision": {
+            "precision": 1.0,
+            "recall": 0.75,
+            "f1_score": 0.8571428571428571,
+            "support": 4
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "Earthquake & Landslide",
+            "Flash Flood / Waterlogging",
+            "General Emergency Assistance",
+            "Major Fire Outbreak",
+            "Medical Emergency",
+            "Road Traffic Collision"
+          ],
+          "matrix": [
+            [
+              2,
+              0,
+              0,
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              4,
+              1,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              2,
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              1,
+              0,
+              4,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              5,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              1,
+              3
+            ]
+          ]
+        }
+      },
+      "severity": {
+        "target": "severity (human_authored_ood)",
+        "sample_count": 26,
+        "accuracy": 0.5,
+        "macro_metrics": {
+          "precision": 0.44146825396825395,
+          "recall": 0.48834498834498835,
+          "f1_score": 0.45134099616858236
+        },
+        "weighted_metrics": {
+          "precision": 0.488209706959707,
+          "recall": 0.5,
+          "f1_score": 0.4821396993810787
+        },
+        "per_class": {
+          "CRITICAL": {
+            "precision": 0.5625,
+            "recall": 0.6923076923076923,
+            "f1_score": 0.6206896551724138,
+            "support": 13
+          },
+          "HIGH": {
+            "precision": 0.42857142857142855,
+            "recall": 0.2727272727272727,
+            "f1_score": 0.3333333333333333,
+            "support": 11
+          },
+          "LOW": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "f1_score": 0.0,
+            "support": 0
+          },
+          "MEDIUM": {
+            "precision": 0.3333333333333333,
+            "recall": 0.5,
+            "f1_score": 0.4,
+            "support": 2
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "CRITICAL",
+            "HIGH",
+            "LOW",
+            "MEDIUM"
+          ],
+          "matrix": [
+            [
+              9,
+              4,
+              0,
+              0
+            ],
+            [
+              6,
+              3,
+              0,
+              2
+            ],
+            [
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              1,
+              0,
+              0,
+              1
+            ]
+          ]
+        }
+      },
+      "medical_urgency": {
+        "target": "medical_urgency (human_authored_ood)",
+        "sample_count": 26,
+        "accuracy": 0.8076923076923077,
+        "macro_metrics": {
+          "precision": 0.7875,
+          "recall": 0.8006535947712419,
+          "f1_score": 0.7926634768740032
+        },
+        "weighted_metrics": {
+          "precision": 0.8144230769230769,
+          "recall": 0.8076923076923077,
+          "f1_score": 0.809839283523494
+        },
+        "per_class": {
+          "NO": {
+            "precision": 0.7,
+            "recall": 0.7777777777777778,
+            "f1_score": 0.7368421052631579,
+            "support": 9
+          },
+          "YES": {
+            "precision": 0.875,
+            "recall": 0.8235294117647058,
+            "f1_score": 0.8484848484848485,
+            "support": 17
+          }
+        },
+        "confusion_matrix": {
+          "labels": [
+            "NO",
+            "YES"
+          ],
+          "matrix": [
+            [
+              7,
+              2
+            ],
+            [
+              3,
+              14
+            ]
+          ]
+        }
+      }
+    }
+  }
+}
