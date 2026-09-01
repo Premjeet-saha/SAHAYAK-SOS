@@ -5,3 +5,5 @@ google-generativeai
 python-dotenv
 scikit-learn
 joblib
+scipy
+numpy

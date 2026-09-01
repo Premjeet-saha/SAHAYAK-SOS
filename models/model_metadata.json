@@ -1,6 +1,6 @@
 {
   "model_version": "sahayak_triage_v1.1_grouped",
-  "created_at_utc": "2026-08-31T16:51:45.414313+00:00",
+  "created_at_utc": "2026-09-01T12:54:54.128235+00:00",
   "random_seed": 42,
   "split_methodology": "StratifiedGroupKFold (n_splits=5, fold=0, groups=template_id)",
   "leakage_audit": {

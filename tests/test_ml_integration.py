@@ -26,7 +26,12 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in os.sys.path:
     os.sys.path.insert(0, BASE_DIR)
 
-from brain import app, predict_ml_triage, _ML_CACHE
+from brain import app
+from services.ml_service import predict_ml_triage
+from services.ml_service import get_ml_cache
+
+
+_ML_CACHE = get_ml_cache()
 
 
 class TestMLIntegration(unittest.TestCase):
