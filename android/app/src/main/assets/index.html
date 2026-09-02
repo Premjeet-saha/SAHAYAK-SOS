@@ -1,0 +1,1676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAHAYAK SOS — Emergency Response Command Center</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+          --bg-dark: #0a0e1a;
+          --bg-panel: #111827;
+          --bg-card: #1f2937;
+          --bg-elevated: #283548;
+          --border: #374151;
+          --border-light: #4b5563;
+          --text-primary: #f9fafb;
+          --text-secondary: #9ca3af;
+          --text-muted: #6b7280;
+          --accent-red: #ef4444;
+          --accent-orange: #f97316;
+          --accent-yellow: #eab308;
+          --accent-green: #22c55e;
+          --accent-blue: #3b82f6;
+          --accent-cyan: #06b6d4;
+          --accent-purple: #a855f7;
+          --severity-color: #ef4444;
+          --vulnerability-color: #f97316;
+          --medical-color: #a855f7;
+          --accessibility-color: #06b6d4;
+          --waiting-color: #eab308;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+          font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+          background: var(--bg-dark);
+          color: var(--text-primary);
+          height: 100vh;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+
+        /* ========== TOP BAR ========== */
+        .top-bar {
+          background: linear-gradient(135deg, var(--bg-panel) 0%, #1a1f2e 100%);
+          border-bottom: 2px solid var(--accent-red);
+          padding: 10px 24px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-shrink: 0;
+          height: 56px;
+        }
+        .top-bar-left { display: flex; align-items: center; gap: 16px; }
+        .top-bar h1 {
+          font-size: 20px;
+          color: var(--accent-red);
+          font-weight: 800;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+        }
+        .top-bar .subtitle { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+        .status-indicators { display: flex; gap: 12px; align-items: center; }
+        .status-badge {
+          font-size: 10px;
+          padding: 4px 10px;
+          border-radius: 12px;
+          font-weight: 700;
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .status-badge.online { background: rgba(34,197,94,0.15); color: var(--accent-green); border: 1px solid rgba(34,197,94,0.3); }
+        .status-badge.active { background: rgba(59,130,246,0.15); color: var(--accent-blue); border: 1px solid rgba(59,130,246,0.3); }
+        .status-badge.prototype { background: rgba(168,85,247,0.15); color: var(--accent-purple); border: 1px solid rgba(168,85,247,0.3); }
+        .status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+        .status-dot.green { background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); animation: pulse-dot 2s infinite; }
+        .status-dot.blue { background: var(--accent-blue); box-shadow: 0 0 8px var(--accent-blue); }
+        .status-dot.purple { background: var(--accent-purple); box-shadow: 0 0 8px var(--accent-purple); }
+        @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        .refresh-btn {
+          background: var(--bg-card);
+          border: 1px solid var(--border);
+          color: var(--text-primary);
+          padding: 6px 14px;
+          border-radius: 6px;
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .refresh-btn:hover { background: var(--bg-elevated); border-color: var(--accent-cyan); }
+        .refresh-btn.refreshing { background: rgba(59,130,246,0.2); border-color: var(--accent-blue); }
+        .refresh-btn.updated { background: rgba(34,197,94,0.2); border-color: var(--accent-green); }
+        .refresh-btn.error { background: rgba(239,68,68,0.2); border-color: var(--accent-red); }
+        .refresh-icon { font-size: 14px; transition: transform 0.3s; }
+        .refresh-btn.refreshing .refresh-icon { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        /* ========== MAIN CONTAINER ========== */
+        .main-container {
+          display: flex;
+          flex: 1;
+          overflow: hidden;
+          min-height: 0;
+        }
+
+        /* ========== LEFT PANEL - SOS INPUT ========== */
+        .sos-panel {
+          width: 320px;
+          background: var(--bg-panel);
+          border-right: 1px solid var(--border);
+          display: flex;
+          flex-direction: column;
+          flex-shrink: 0;
+          overflow-y: auto;
+        }
+        .panel-header {
+          padding: 12px 16px;
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 1.5px;
+          color: var(--accent-cyan);
+          border-bottom: 1px solid var(--border);
+          background: rgba(6,182,212,0.05);
+        }
+        .sos-panel-body { padding: 16px; flex: 1; }
+        .input-tabs {
+          display: flex;
+          gap: 3px;
+          background: var(--bg-card);
+          padding: 3px;
+          border-radius: 8px;
+          margin-bottom: 16px;
+        }
+        .tab-btn {
+          flex: 1;
+          padding: 10px 8px;
+          border: none;
+          background: transparent;
+          color: var(--text-secondary);
+          cursor: pointer;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 600;
+          transition: 0.2s;
+        }
+        .tab-btn:hover { color: var(--text-primary); }
+        .tab-btn.active { background: var(--accent-red); color: white; box-shadow: 0 2px 8px rgba(239,68,68,0.3); }
+        .input-view { display: none; }
+        .input-view.active { display: block; }
+        textarea {
+          width: 100%;
+          height: 90px;
+          background: var(--bg-dark);
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          padding: 12px;
+          color: var(--text-primary);
+          font-size: 14px;
+          resize: none;
+          font-family: inherit;
+        }
+        textarea:focus { border-color: var(--accent-red); outline: none; box-shadow: 0 0 0 2px rgba(239,68,68,0.2); }
+        .mic-container { text-align: center; padding: 16px 0; }
+        .mic-btn {
+          width: 64px; height: 64px;
+          border-radius: 50%;
+          background: var(--bg-card);
+          border: 2px solid var(--border);
+          color: var(--text-primary);
+          font-size: 26px;
+          cursor: pointer;
+          transition: 0.3s;
+        }
+        .mic-btn:hover { border-color: var(--accent-red); }
+        .mic-btn.recording {
+          background: rgba(239,68,68,0.2);
+          border-color: var(--accent-red);
+          color: var(--accent-red);
+          animation: pulse 1.5s infinite;
+        }
+        .mic-status { font-size: 12px; color: var(--text-secondary); margin-top: 10px; }
+        .transcription-box {
+          background: var(--bg-dark);
+          padding: 10px;
+          border-radius: 6px;
+          font-size: 13px;
+          color: var(--text-primary);
+          display: none;
+          margin-top: 12px;
+          border: 1px solid var(--border);
+        }
+        .upload-box {
+          display: block;
+          border: 2px dashed var(--border);
+          border-radius: 8px;
+          padding: 24px;
+          text-align: center;
+          cursor: pointer;
+          background: var(--bg-dark);
+          transition: 0.2s;
+        }
+        .upload-box:hover { border-color: var(--accent-red); background: rgba(239,68,68,0.05); }
+        #image-preview { max-width: 100%; max-height: 120px; display: none; margin-top: 12px; border-radius: 8px; }
+        @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+        .sos-submit-btn {
+          width: 100%;
+          padding: 14px;
+          background: linear-gradient(135deg, var(--accent-red) 0%, #dc2626 100%);
+          color: white;
+          border: none;
+          border-radius: 8px;
+          font-size: 15px;
+          font-weight: 700;
+          cursor: pointer;
+          margin-top: 18px;
+          transition: 0.2s;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+        .sos-submit-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(239,68,68,0.4); }
+        .sos-submit-btn:active { transform: translateY(0); }
+        .location-source { font-size: 11px; color: var(--text-secondary); margin-top: 10px; text-align: center; }
+
+        /* ========== CENTER - MAP ========== */
+        .map-container {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          position: relative;
+          min-width: 0;
+        }
+        #map { flex: 1; z-index: 1; background: #0f1419; }
+
+        /* ========== RIGHT PANEL ========== */
+        .right-panel {
+          width: 340px;
+          background: var(--bg-panel);
+          border-left: 1px solid var(--border);
+          display: flex;
+          flex-direction: column;
+          flex-shrink: 0;
+          overflow-y: auto;
+        }
+
+        /* INVENTORY PANEL */
+        .inventory-section { padding: 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .inventory-grid { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+        .inv-row {
+          display: grid;
+          grid-template-columns: 70px 1fr auto;
+          align-items: center;
+          gap: 10px;
+          font-size: 12px;
+          padding: 6px 8px;
+          background: var(--bg-dark);
+          border-radius: 6px;
+        }
+        .inv-label { font-weight: 700; color: var(--text-primary); text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
+        .inv-bars { display: flex; gap: 4px; align-items: center; }
+        .inv-bar {
+          height: 16px;
+          border-radius: 3px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 9px;
+          font-weight: 700;
+          color: white;
+          min-width: 18px;
+          padding: 0 4px;
+        }
+        .inv-bar.available { background: var(--accent-green); }
+        .inv-bar.allocated { background: var(--accent-blue); }
+        .inv-bar.unmet { background: var(--accent-red); }
+        .inv-stats { font-size: 10px; color: var(--text-secondary); text-align: right; white-space: nowrap; }
+
+        /* OPTIMIZATION PANEL */
+        .opt-section { padding: 14px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .opt-status {
+          font-size: 12px;
+          font-weight: 700;
+          padding: 8px 12px;
+          border-radius: 6px;
+          text-align: center;
+          margin-bottom: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .opt-status.optimal { background: rgba(34,197,94,0.15); color: var(--accent-green); border: 1px solid rgba(34,197,94,0.3); }
+        .opt-status.fallback { background: rgba(249,115,22,0.15); color: var(--accent-orange); border: 1px solid rgba(249,115,22,0.3); }
+        .opt-status.fallback_ok { background: rgba(249,115,22,0.15); color: var(--accent-orange); border: 1px solid rgba(249,115,22,0.3); }
+        .opt-status.error { background: rgba(239,68,68,0.15); color: var(--accent-red); border: 1px solid rgba(239,68,68,0.3); }
+        .opt-status.no_zones { background: rgba(148,163,184,0.15); color: var(--text-secondary); border: 1px solid var(--border); }
+        .opt-row { display: flex; justify-content: space-between; font-size: 11px; padding: 4px 0; color: var(--text-secondary); }
+        .opt-row .val { color: var(--text-primary); font-weight: 600; }
+        .opt-reasoning {
+          margin-top: 10px;
+          padding: 10px;
+          background: var(--bg-dark);
+          border-radius: 6px;
+          font-size: 11px;
+          color: var(--text-secondary);
+          border-left: 3px solid var(--accent-blue);
+          line-height: 1.5;
+        }
+        .opt-reasoning .reason-title { font-weight: 700; color: var(--accent-cyan); margin-bottom: 6px; font-size: 10px; text-transform: uppercase; }
+
+        /* CASES LIST */
+        .cases-section {
+          padding: 14px;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-height: 150px;
+          overflow: hidden;
+        }
+        .cases-section .panel-header { padding: 0 0 10px 0; border: none; background: none; flex-shrink: 0; }
+        .case-list {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          overflow-y: auto;
+          flex: 1;
+          padding-right: 4px;
+        }
+        .case-item {
+          padding: 10px 12px;
+          background: var(--bg-dark);
+          border-radius: 6px;
+          cursor: pointer;
+          transition: 0.2s;
+          border-left: 3px solid transparent;
+        }
+        .case-item:hover { background: var(--bg-card); border-left-color: var(--accent-cyan); }
+        .case-item.selected { border-left-color: var(--accent-red); background: var(--bg-card); }
+        .case-item .case-top { display: flex; justify-content: space-between; align-items: center; }
+        .case-id { font-size: 11px; font-weight: 700; color: var(--accent-cyan); }
+        .case-priority { font-size: 16px; font-weight: 800; }
+        .case-priority.critical { color: var(--accent-red); }
+        .case-priority.high { color: var(--accent-orange); }
+        .case-priority.medium { color: var(--accent-yellow); }
+        .case-priority.low { color: var(--accent-green); }
+        .case-meta { font-size: 10px; color: var(--text-secondary); margin-top: 4px; }
+
+        /* ========== BOTTOM SECTION ========== */
+        .bottom-section {
+          height: 220px;
+          background: var(--bg-panel);
+          border-top: 1px solid var(--border);
+          display: flex;
+          flex-shrink: 0;
+        }
+        .zones-panel {
+          flex: 1;
+          padding: 14px 16px;
+          overflow-y: auto;
+          border-right: 1px solid var(--border);
+          min-width: 0;
+        }
+        .zones-table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 8px; }
+        .zones-table th {
+          text-align: left;
+          padding: 6px 8px;
+          background: var(--bg-card);
+          color: var(--text-secondary);
+          font-weight: 700;
+          text-transform: uppercase;
+          font-size: 9px;
+          letter-spacing: 0.5px;
+          position: sticky;
+          top: 0;
+        }
+        .zones-table td {
+          padding: 6px 8px;
+          border-bottom: 1px solid var(--border);
+          color: var(--text-primary);
+        }
+        .zones-table tr:hover td { background: var(--bg-card); }
+        .zone-status { font-weight: 700; font-size: 9px; padding: 3px 6px; border-radius: 4px; text-transform: uppercase; }
+        .zone-status.served { background: rgba(34,197,94,0.15); color: var(--accent-green); }
+        .zone-status.partial { background: rgba(249,115,22,0.15); color: var(--accent-orange); }
+        .zone-status.unserved { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+
+        .assignments-panel {
+          width: 300px;
+          padding: 14px 16px;
+          overflow-y: auto;
+          flex-shrink: 0;
+        }
+        .assignment-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 0;
+          font-size: 11px;
+          border-bottom: 1px solid var(--border);
+        }
+        .assignment-resource { font-weight: 700; color: var(--accent-blue); }
+        .assignment-arrow { color: var(--text-secondary); font-size: 12px; }
+        .assignment-zone { color: var(--accent-cyan); font-weight: 600; }
+        .assignment-dist { margin-left: auto; font-size: 10px; color: var(--text-secondary); }
+
+        /* ========== INCIDENT DETAIL MODAL ========== */
+        .detail-overlay {
+          display: none;
+          position: fixed;
+          top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(0,0,0,0.75);
+          z-index: 1000;
+          justify-content: center;
+          align-items: center;
+          backdrop-filter: blur(4px);
+        }
+        .detail-overlay.active { display: flex; }
+        .detail-modal {
+          background: var(--bg-panel);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          width: 640px;
+          max-height: 85vh;
+          overflow-y: auto;
+          padding: 24px;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .detail-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 20px;
+          padding-bottom: 14px;
+          border-bottom: 1px solid var(--border);
+        }
+        .detail-header h3 { color: var(--accent-red); font-size: 18px; font-weight: 700; }
+        .detail-close {
+          background: var(--bg-card);
+          border: 1px solid var(--border);
+          color: var(--text-secondary);
+          font-size: 20px;
+          cursor: pointer;
+          width: 32px;
+          height: 32px;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: 0.2s;
+        }
+        .detail-close:hover { background: var(--accent-red); color: white; border-color: var(--accent-red); }
+        .detail-section { margin-bottom: 20px; }
+        .detail-section-title {
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 1.5px;
+          color: var(--accent-cyan);
+          margin-bottom: 10px;
+          padding-bottom: 6px;
+          border-bottom: 1px solid var(--border);
+        }
+        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; }
+        .detail-row { display: flex; justify-content: space-between; padding: 4px 0; }
+        .detail-row .label { color: var(--text-secondary); }
+        .detail-row .value { color: var(--text-primary); font-weight: 600; }
+
+        /* Priority Breakdown in Modal */
+        .priority-score-display {
+          text-align: center;
+          margin-bottom: 16px;
+          padding: 16px;
+          background: var(--bg-dark);
+          border-radius: 8px;
+        }
+        .priority-score-display .score-value {
+          font-size: 48px;
+          font-weight: 800;
+          line-height: 1;
+        }
+        .priority-score-display .score-label {
+          font-size: 11px;
+          color: var(--text-secondary);
+          margin-top: 4px;
+        }
+        .priority-breakdown-bar {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin: 6px 0;
+          font-size: 11px;
+        }
+        .pb-label { width: 100px; color: var(--text-secondary); font-weight: 500; }
+        .pb-bar-container { flex: 1; height: 16px; background: var(--bg-dark); border-radius: 4px; overflow: hidden; }
+        .pb-bar { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+        .pb-bar.severity { background: var(--severity-color); }
+        .pb-bar.vulnerability { background: var(--vulnerability-color); }
+        .pb-bar.medical { background: var(--medical-color); }
+        .pb-bar.accessibility { background: var(--accessibility-color); }
+        .pb-bar.waiting_time { background: var(--waiting-color); }
+        .pb-value { width: 70px; text-align: right; font-weight: 700; }
+        .pb-formula { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+        .ml-prediction-box {
+          background: rgba(168,85,247,0.08);
+          border: 1px solid rgba(168,85,247,0.25);
+          border-radius: 8px;
+          padding: 14px;
+          font-size: 12px;
+        }
+        .ml-prediction-box .ml-title { color: var(--accent-purple); font-weight: 700; margin-bottom: 8px; font-size: 13px; }
+        .ml-row { display: flex; justify-content: space-between; padding: 3px 0; }
+        .ml-row .ml-label { color: var(--text-secondary); }
+        .ml-row .ml-val { color: var(--text-primary); font-weight: 600; }
+        .ml-unavailable { color: var(--text-secondary); font-style: italic; font-size: 12px; padding: 8px; background: var(--bg-dark); border-radius: 6px; }
+        .ml-disclaimer { margin-top: 8px; font-size: 10px; color: var(--text-muted); line-height: 1.4; }
+
+        .data-tag {
+          display: inline-block;
+          font-size: 9px;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-weight: 700;
+          margin-left: 4px;
+          text-transform: uppercase;
+        }
+        .data-tag.gps { background: rgba(34,197,94,0.15); color: var(--accent-green); }
+        .data-tag.demo { background: rgba(249,115,22,0.15); color: var(--accent-orange); }
+        .data-tag.prototype { background: rgba(168,85,247,0.15); color: var(--accent-purple); }
+        .data-tag.ml { background: rgba(168,85,247,0.15); color: var(--accent-purple); }
+        .data-tag.deterministic { background: rgba(59,130,246,0.15); color: var(--accent-blue); }
+        .data-tag.optimization { background: rgba(6,182,212,0.15); color: var(--accent-cyan); }
+
+        /* ========== MAP LEGEND ========== */
+        .map-legend {
+          position: absolute;
+          bottom: 12px;
+          left: 12px;
+          background: rgba(10,14,26,0.92);
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          padding: 12px;
+          font-size: 10px;
+          z-index: 500;
+          backdrop-filter: blur(4px);
+        }
+        .map-legend .legend-title { font-weight: 700; margin-bottom: 8px; color: var(--text-primary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .legend-item { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+        .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .legend-line { width: 20px; height: 2px; flex-shrink: 0; }
+        .legend-note { margin-top: 6px; font-size: 9px; color: var(--accent-purple); font-style: italic; }
+
+        /* ========== SCROLLBAR ========== */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: var(--bg-dark); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+       /* ========== RESPONSIVE ========== */
+
+/* Tablet / smaller desktop */
+@media (max-width: 1366px) {
+  .sos-panel {
+    width: 280px;
+  }
+
+  .right-panel {
+    width: 300px;
+  }
+
+  .assignments-panel {
+    width: 260px;
+  }
+}
+
+
+/* ========== MOBILE ========== */
+@media (max-width: 600px) {
+
+  body {
+    height: auto;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  /* TOP BAR */
+  .top-bar {
+    height: auto;
+    min-height: 64px;
+    padding: 10px 12px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .top-bar-left {
+    width: 100%;
+  }
+
+  .top-bar h1 {
+    font-size: 18px;
+  }
+
+  .top-bar .subtitle {
+    font-size: 9px;
+  }
+
+  .status-indicators {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .status-badge {
+    justify-content: center;
+    font-size: 9px;
+    padding: 6px 4px;
+  }
+
+  .refresh-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 7px;
+  }
+
+
+  /* MAIN CONTENT */
+  .main-container {
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+    width: 100%;
+  }
+
+
+  /* SOS PANEL */
+  .sos-panel {
+    width: 100%;
+    min-height: auto;
+    max-height: none;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    overflow: visible;
+  }
+
+  .sos-panel-body {
+    padding: 14px;
+  }
+
+  .panel-header {
+    padding: 12px 14px;
+    font-size: 11px;
+  }
+
+  .input-tabs {
+    width: 100%;
+  }
+
+  textarea {
+    height: 110px;
+    font-size: 14px;
+  }
+
+  .sos-submit-btn {
+    min-height: 56px;
+    font-size: 16px;
+  }
+
+
+  /* MAP */
+  .map-container {
+    width: 100%;
+    min-height: 300px;
+    height: 300px;
+    order: 2;
+  }
+
+  #map {
+    width: 100%;
+    min-height: 300px;
+  }
+
+
+  /* RIGHT PANEL */
+  .right-panel {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    overflow: visible;
+    order: 3;
+  }
+
+
+  /* ASSIGNMENTS */
+  .assignments-panel {
+    width: 100%;
+    padding: 14px;
+    order: 4;
+  }
+
+
+  /* Make inventory rows fit phone */
+  .inv-row {
+    grid-template-columns: 70px 1fr auto;
+    gap: 6px;
+  }
+
+  .inv-label {
+    font-size: 9px;
+  }
+
+  .inv-stats {
+    font-size: 9px;
+  }
+
+
+  /* MAP LEGEND */
+  .map-legend {
+    max-width: calc(100% - 24px);
+    font-size: 9px;
+  }
+
+  .legend-item {
+    font-size: 9px;
+  }
+
+
+  /* Prevent content from becoming wider than phone */
+  * {
+    max-width: 100%;
+  }
+  /* ========== MOBILE ZONE DASHBOARD ========== */
+
+.bottom-section {
+    height: auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.zones-panel {
+    width: 100%;
+    flex: none;
+    padding: 14px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+}
+
+.zones-table {
+    width: 100%;
+    min-width: 0;
+    font-size: 10px;
+}
+
+.zones-table th,
+.zones-table td {
+    padding: 8px 6px;
+    white-space: nowrap;
+}
+
+.assignments-panel {
+    width: 100%;
+    flex: none;
+    padding: 14px;
+    min-height: 150px;
+    overflow-y: visible;
+}
+
+.assignment-item {
+    width: 100%;
+}
+}
+    </style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+    <div class="top-bar-left">
+        <div>
+            <h1>SAHAYAK SOS</h1>
+            <div class="subtitle">Emergency Response & Resource Command Center</div>
+        </div>
+    </div>
+    <div class="status-indicators">
+        <div class="status-badge online"><span class="status-dot green"></span> System Online</div>
+        <div class="status-badge active"><span class="status-dot blue"></span> Optimization Active</div>
+        <div class="status-badge prototype"><span class="status-dot purple"></span> Prototype / Demo</div>
+        <button class="refresh-btn" id="refresh-btn" onclick="manualRefresh()">
+            <span class="refresh-icon">&#8635;</span>
+            <span id="refresh-label">Refresh State</span>
+        </button>
+    </div>
+</div>
+
+<!-- MAIN CONTAINER -->
+<div class="main-container">
+
+    <!-- LEFT: SOS INPUT PANEL -->
+    <div class="sos-panel">
+        <div class="panel-header">Citizen SOS Input</div>
+        <div class="sos-panel-body">
+            <div class="input-tabs">
+                <button class="tab-btn active" onclick="switchInput('text', this)">Text</button>
+                <button class="tab-btn" onclick="switchInput('voice', this)">Voice</button>
+                <button class="tab-btn" onclick="switchInput('image', this)">Photo</button>
+            </div>
+
+            <div id="view-text" class="input-view active">
+                <textarea id="user-input" placeholder="Describe your emergency... (Hindi / English / Hinglish)"></textarea>
+            </div>
+
+            <div id="view-voice" class="input-view">
+                <div class="mic-container">
+                    <button id="mic-btn" class="mic-btn" onclick="startRecording()">&#127908;</button>
+                    <div class="mic-status" id="mic-status">Tap to speak</div>
+                    <div class="transcription-box" id="transcription-box"></div>
+                </div>
+            </div>
+
+            <div id="view-image" class="input-view">
+                <label class="upload-box" for="file-upload">
+                    <div style="font-size:32px;">&#128247;</div>
+                    <div style="font-size:13px;color:var(--text-secondary);margin-top:8px;">Tap to upload damage photo</div>
+                    <input type="file" id="file-upload" accept="image/*" style="display:none" onchange="previewImage(event)">
+                </label>
+                <div style="text-align:center;"><img id="image-preview" src="" alt="Preview"></div>
+            </div>
+
+            <button class="sos-submit-btn" onclick="getLocationAndSend()">Send SOS</button>
+            <div class="location-source" id="location-source-display">Location: awaiting input</div>
+        </div>
+    </div>
+
+    <!-- CENTER: MAP -->
+    <div class="map-container">
+        <div id="map"></div>
+        <div class="map-legend">
+            <div class="legend-title">Map Legend</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ef4444;"></div> Critical (80-100)</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#f97316;"></div> High (60-79)</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#eab308;"></div> Medium (40-59)</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#22c55e;"></div> Low (0-39)</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div> Allocated Resource</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#94a3b8;"></div> Available Resource</div>
+            <div class="legend-item"><div class="legend-line" style="background:#06b6d4;"></div> Assignment</div>
+            <div class="legend-item"><div class="legend-line" style="background:#f97316;"></div> Fire Resource</div>
+            <div class="legend-note">Resource locations: PROTOTYPE</div>
+        </div>
+    </div>
+
+    <!-- RIGHT: COMMAND CENTER -->
+    <div class="right-panel">
+        <div class="inventory-section">
+            <div class="panel-header" style="padding:0 0 8px 0;border:none;background:none;">Resource Inventory</div>
+            <div class="inventory-grid" id="inventory-grid">
+                <div class="inv-row"><span class="inv-label">NDRF</span><div class="inv-bars"><span style="font-size:11px;color:var(--text-secondary);">Loading...</span></div></div>
+                <div class="inv-row"><span class="inv-label">Ambulance</span><div class="inv-bars"><span style="font-size:11px;color:var(--text-secondary);">Loading...</span></div></div>
+                <div class="inv-row"><span class="inv-label">Boat</span><div class="inv-bars"><span style="font-size:11px;color:var(--text-secondary);">Loading...</span></div></div>
+                <div class="inv-row"><span class="inv-label">Shelter</span><div class="inv-bars"><span style="font-size:11px;color:var(--text-secondary);">Loading...</span></div></div>
+                <div class="inv-row"><span class="inv-label">Hospital</span><div class="inv-bars"><span style="font-size:11px;color:var(--text-secondary);">Loading...</span></div></div>
+                <div class="inv-row"><span class="inv-label">Fire</span><div class="inv-bars"><span style="font-size:11px;color:var(--text-secondary);">Loading...</span></div></div>
+            </div>
+        </div>
+
+        <div class="opt-section">
+            <div class="panel-header" style="padding:0 0 8px 0;border:none;background:none;">Optimization Decision</div>
+            <div id="opt-status" class="opt-status no_zones">Awaiting Data</div>
+            <div id="opt-details">
+                <div class="opt-row"><span>Method:</span><span class="val" id="opt-method">&mdash;</span></div>
+                <div class="opt-row"><span>Cases:</span><span class="val" id="opt-cases">0</span></div>
+                <div class="opt-row"><span>Zones Active:</span><span class="val" id="opt-zones">0</span></div>
+                <div class="opt-row"><span>Assignments:</span><span class="val" id="opt-assignments">0</span></div>
+                <div class="opt-row"><span>Unmet Demand:</span><span class="val" id="opt-unmet">0</span></div>
+            </div>
+            <div class="opt-reasoning" id="opt-reasoning" style="display:none;">
+                <div class="reason-title">Why This Allocation?</div>
+                <div id="opt-reasoning-text"></div>
+            </div>
+        </div>
+
+        <div class="cases-section">
+            <div class="panel-header" style="padding:0 0 8px 0;border:none;background:none;">Active Cases (<span id="case-count">0</span>)</div>
+            <div class="case-list" id="case-list">
+                <div style="font-size:12px;color:var(--text-secondary);text-align:center;padding:20px;">No active cases</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- BOTTOM: ZONES & ASSIGNMENTS -->
+<div class="bottom-section">
+    <div class="zones-panel">
+        <div class="panel-header" style="padding:0 0 8px 0;border:none;background:none;">Zone Dashboard</div>
+        <table class="zones-table">
+            <thead>
+            <tr>
+                <th>Zone</th>
+                <th>Cases</th>
+                <th>Critical</th>
+                <th>High</th>
+                <th>Priority Demand</th>
+                <th>NDRF</th>
+                <th>AMB</th>
+                <th>BOAT</th>
+                <th>SHELTER</th>
+                <th>HOSP</th>
+                <th>FIRE</th>
+                <th>Status</th>
+            </tr>
+            </thead>
+            <tbody id="zones-tbody">
+            <tr><td colspan="12" style="text-align:center;color:var(--text-secondary);">No zone data</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="assignments-panel">
+        <div class="panel-header" style="padding:0 0 8px 0;border:none;background:none;">Resource Assignments</div>
+        <div id="assignments-list">
+            <div style="font-size:12px;color:var(--text-secondary);">No assignments yet</div>
+        </div>
+    </div>
+</div>
+
+<!-- INCIDENT DETAIL MODAL -->
+<div class="detail-overlay" id="detail-overlay" onclick="closeDetail(event)">
+    <div class="detail-modal" onclick="event.stopPropagation()">
+        <div class="detail-header">
+            <h3 id="detail-title">Incident Detail</h3>
+            <button class="detail-close" onclick="closeDetail()">&times;</button>
+        </div>
+        <div id="detail-content"></div>
+    </div>
+</div>
+
+<script>
+    // ==================== STATE ====================
+    var API_BASE =
+  window.location.protocol === 'file:'
+    ? 'http://172.21.198.142:5000'
+    : '';
+    var map;
+    var sosLayer, zoneLayer, resourceLayer, assignmentLayer;
+    var currentState = null;
+    var selectedCaseId = null;
+    var currentType = 'text';
+    var payloadData = '';
+    var refreshInterval;
+    var isRefreshing = false;
+    // Offline emergency SMS destination.
+    // Replace this with your team's emergency/control-center phone number.
+    var EMERGENCY_SMS_NUMBER = 'YOUR_EMERGENCY_NUMBER';
+
+
+    // ==================== MAP INITIALIZATION ====================
+    function initMap() {
+      map = L.map('map').setView([20.296, 85.824], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      sosLayer = L.layerGroup().addTo(map);
+      zoneLayer = L.layerGroup().addTo(map);
+      resourceLayer = L.layerGroup().addTo(map);
+      assignmentLayer = L.layerGroup().addTo(map);
+
+      refreshCommandCenter();
+      refreshInterval = setInterval(refreshCommandCenter, 8000);
+    }
+
+    // ==================== INPUT HANDLING ====================
+    function switchInput(type, element) {
+      currentType = type;
+      document.querySelectorAll('.tab-btn').forEach(function(btn) { btn.classList.remove('active'); });
+      element.classList.add('active');
+      document.querySelectorAll('.input-view').forEach(function(view) { view.classList.remove('active'); });
+      document.getElementById('view-' + type).classList.add('active');
+    }
+
+    function startRecording() {
+      var btn = document.getElementById('mic-btn');
+      var statusEl = document.getElementById('mic-status');
+      var box = document.getElementById('transcription-box');
+
+      var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert('Voice recognition requires Chrome or Edge browser.');
+        return;
+      }
+
+      var recognition = new SpeechRecognition();
+      recognition.lang = 'hi-IN';
+      recognition.interimResults = false;
+
+      recognition.onstart = function() {
+        btn.classList.add('recording');
+        statusEl.innerText = 'Listening...';
+        box.style.display = 'none';
+      };
+
+      recognition.onresult = function(event) {
+        var transcript = event.results[0][0].transcript;
+        btn.classList.remove('recording');
+        statusEl.innerText = 'Audio captured';
+        box.style.display = 'block';
+        payloadData = transcript;
+        box.innerText = '"' + transcript + '"';
+      };
+
+      recognition.onerror = function() {
+        btn.classList.remove('recording');
+        statusEl.innerText = 'Error capturing audio. Try again.';
+      };
+
+      recognition.start();
+    }
+
+    function previewImage(event) {
+      var file = event.target.files[0];
+      if (file) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          var img = document.getElementById('image-preview');
+          img.src = e.target.result;
+          img.style.display = 'inline-block';
+          payloadData = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    // ==================== SOS SUBMISSION ====================
+  function getLocationAndSend() {
+
+  if (currentType === 'text') {
+    payloadData = document.getElementById('user-input').value;
+  }
+
+  if (!payloadData || !String(payloadData).trim()) {
+    alert('Please describe the emergency first.');
+    return;
+  }
+
+  // ANDROID APP
+  // Offline -> native GPS + SMS
+ if (window.Android &&
+    typeof Android.sendOfflineSOS === 'function') {
+
+    Android.sendOfflineSOS(String(payloadData));
+    return;
+}
+
+  // ONLINE -> Flask backend
+  var fallbackLat = 20.296;
+  var fallbackLng = 85.824;
+
+  if (navigator.geolocation) {
+
+    navigator.geolocation.getCurrentPosition(
+
+      function(pos) {
+        sendSOS(
+          pos.coords.latitude,
+          pos.coords.longitude,
+          'gps'
+        );
+      },
+
+      function() {
+        sendSOS(
+          fallbackLat,
+          fallbackLng,
+          'demo_fallback'
+        );
+      },
+
+      {
+        enableHighAccuracy: true,
+        timeout: 5000,
+        maximumAge: 0
+      }
+    );
+
+  } else {
+    sendSOS(
+      fallbackLat,
+      fallbackLng,
+      'demo_fallback'
+    );
+  }
+}
+
+
+    function openSmsFallback(lat, lng) {
+      var message = buildEmergencySms(lat, lng);
+
+      document.getElementById('location-source-display').innerText =
+        'GNSS location captured — opening SMS...';
+
+      // A browser cannot silently send SMS. This opens the phone's SMS composer
+      // with the SOS already filled in; the user confirms Send.
+      var smsUrl =
+        'sms:' + encodeURIComponent(EMERGENCY_SMS_NUMBER) +
+        '?body=' + encodeURIComponent(message);
+
+      window.location.href = smsUrl;
+    }
+
+    function sendSOS(lat, lng, locationSource) {
+      document.getElementById('location-source-display').innerText =
+        'Location: GNSS/device location captured';
+
+      var offlineId =
+        'OFF-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+
+      var sosPayload = {
+        client_incident_id: offlineId,
+        lat: lat,
+        lng: lng,
+        raw_input: payloadData,
+        type: currentType,
+        location_source: locationSource,
+        client_timestamp: new Date().toISOString()
+      };
+
+      // Normal path: use the existing Flask backend when reachable.
+      // Offline path: use cellular SMS instead of fetch().
+      if (!navigator.onLine) {
+        openSmsFallback(lat, lng);
+        return;
+      }
+
+      fetch(API_BASE + '/report-emergency', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sosPayload)
+      })
+      .then(function(res) {
+        if (!res.ok) throw new Error('Backend returned HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(resp) {
+        if (resp.status === 'Success') {
+          document.getElementById('location-source-display').innerText =
+            'Location: GNSS | SOS delivered to SAHAYAK backend';
+
+          document.getElementById('user-input').value = '';
+          document.getElementById('image-preview').style.display = 'none';
+          document.getElementById('transcription-box').style.display = 'none';
+          payloadData = '';
+          refreshCommandCenter();
+        } else {
+          throw new Error('Backend rejected SOS');
+        }
+      })
+      .catch(function(err) {
+        console.error('SOS send error:', err);
+
+        // Internet may have disappeared after navigator.onLine said "online".
+        // Fall back to SMS.
+        openSmsFallback(lat, lng);
+      });
+    }
+
+    // ==================== COMMAND CENTER REFRESH ====================
+    function manualRefresh() {
+      if (isRefreshing) return;
+      isRefreshing = true;
+
+      var btn = document.getElementById('refresh-btn');
+      var label = document.getElementById('refresh-label');
+      btn.className = 'refresh-btn refreshing';
+      label.innerText = 'Refreshing...';
+
+      fetch(API_BASE + '/allocation-state')
+        .then(function(res) { return res.json(); })
+        .then(function(state) {
+          if (state.status === 'success') {
+            currentState = state;
+            renderAllocationState(state);
+            btn.className = 'refresh-btn updated';
+            label.innerText = 'Updated just now';
+            setTimeout(function() {
+              btn.className = 'refresh-btn';
+              label.innerText = 'Refresh State';
+              isRefreshing = false;
+            }, 2000);
+          } else {
+            throw new Error('Invalid state response');
+          }
+        })
+        .catch(function(err) {
+          console.error('Refresh error:', err);
+          btn.className = 'refresh-btn error';
+          label.innerText = 'Unable to refresh';
+          setTimeout(function() {
+            btn.className = 'refresh-btn';
+            label.innerText = 'Refresh State';
+            isRefreshing = false;
+          }, 3000);
+        });
+    }
+
+    function refreshCommandCenter() {
+     fetch(API_BASE + '/allocation-state')
+        .then(function(res) { return res.json(); })
+        .then(function(state) {
+          if (state.status === 'success') {
+            currentState = state;
+            renderAllocationState(state);
+          }
+        })
+        .catch(function(err) { console.error('Polling refresh error:', err); });
+    }
+
+    // ==================== CANONICAL RENDER PIPELINE ====================
+    function renderAllocationState(state) {
+      renderInventory(state.inventory);
+      renderOptimization(state.optimization, state.zone_summary, state.zones);
+      renderCases(state.cases);
+      renderZones(state.zones);
+      renderAssignments(state.assignments);
+      renderMap(state);
+    }
+
+    // ==================== RENDER INVENTORY ====================
+    function renderInventory(inventory) {
+      var grid = document.getElementById('inventory-grid');
+      var types = ['ndrf', 'ambulance', 'boat', 'shelter', 'hospital', 'fire'];
+      var labels = ['NDRF', 'Ambulance', 'Boat', 'Shelter', 'Hospital', 'Fire'];
+
+      var html = '';
+      for (var i = 0; i < types.length; i++) {
+        var t = types[i];
+        var inv = inventory[t] || { available: 0, allocated: 0, total: 0, demand: 0, unmet: 0 };
+        var total = inv.total || 1;
+        var availPct = (inv.available / total) * 100;
+        var allocPct = (inv.allocated / total) * 100;
+
+        html += '<div class="inv-row">';
+        html += '<span class="inv-label">' + labels[i] + '</span>';
+        html += '<div class="inv-bars">';
+        html += '<div class="inv-bar available" style="width:' + Math.max(availPct * 0.7, 18) + 'px">' + inv.available + '</div>';
+        html += '<div class="inv-bar allocated" style="width:' + Math.max(allocPct * 0.7, 18) + 'px">' + inv.allocated + '</div>';
+        if (inv.unmet > 0) {
+          html += '<div class="inv-bar unmet" style="width:' + Math.max(inv.unmet * 6, 18) + 'px">' + inv.unmet + '</div>';
+        }
+        html += '</div>';
+        html += '<span class="inv-stats">D:' + inv.demand + ' U:' + inv.unmet + '</span>';
+        html += '</div>';
+      }
+      grid.innerHTML = html;
+    }
+
+    // ==================== RENDER OPTIMIZATION ====================
+    function renderOptimization(opt, zoneSummary, zones) {
+      var statusEl = document.getElementById('opt-status');
+      var status = opt.status || 'no_zones';
+
+      statusEl.className = 'opt-status ' + status;
+      if (status === 'optimal') statusEl.innerText = 'Optimal Solution';
+      else if (status === 'fallback_ok' || status === 'fallback') statusEl.innerText = 'Fallback Allocation';
+      else if (status === 'error') statusEl.innerText = 'Optimization Error';
+      else statusEl.innerText = 'Awaiting Data';
+
+      document.getElementById('opt-method').innerText = (opt.method || '&mdash;').replace(/_/g, ' ');
+      document.getElementById('opt-cases').innerText = currentState ? currentState.case_count : 0;
+      document.getElementById('opt-zones').innerText = zoneSummary ? (zoneSummary.zones_with_cases || 0) : 0;
+      document.getElementById('opt-assignments').innerText = currentState ? (currentState.assignments ? currentState.assignments.length : 0) : 0;
+
+      var totalUnmet = 0;
+      if (zones) {
+        zones.forEach(function(z) {
+          var unmet = z.unmet_demand || {};
+          Object.keys(unmet).forEach(function(k) { totalUnmet += unmet[k]; });
+        });
+      }
+      document.getElementById('opt-unmet').innerText = totalUnmet;
+
+      var reasoningEl = document.getElementById('opt-reasoning');
+      var reasoningText = document.getElementById('opt-reasoning-text');
+      if (zones && zones.length > 0) {
+        reasoningEl.style.display = 'block';
+        var reasons = [];
+        zones.forEach(function(z) {
+          if (z.reason) {
+            reasons.push('<div style="margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--border);">' + z.reason + '</div>');
+          }
+        });
+        reasoningText.innerHTML = reasons.length > 0 ? reasons.join('') : '<div style="color:var(--text-secondary);">Standard allocation based on priority demand.</div>';
+      } else {
+        reasoningEl.style.display = 'none';
+      }
+    }
+
+    // ==================== RENDER CASES ====================
+    function renderCases(cases) {
+      var list = document.getElementById('case-list');
+      document.getElementById('case-count').innerText = cases ? cases.length : 0;
+
+      if (!cases || cases.length === 0) {
+        list.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);text-align:center;padding:20px;">No active cases</div>';
+        return;
+      }
+
+      var html = '';
+      cases.forEach(function(c) {
+        var score = c.priority_score || 0;
+        var priorityClass = 'low';
+        if (score >= 80) priorityClass = 'critical';
+        else if (score >= 60) priorityClass = 'high';
+        else if (score >= 40) priorityClass = 'medium';
+
+        var isSelected = c.incident_id === selectedCaseId ? ' selected' : '';
+        html += '<div class="case-item' + isSelected + '" onclick="selectCase(\'' + c.incident_id + '\')">';
+        html += '<div class="case-top">';
+        html += '<span class="case-id">' + c.incident_id + '</span>';
+        html += '<span class="case-priority ' + priorityClass + '">' + score + '</span>';
+        html += '</div>';
+        html += '<div class="case-meta">';
+        html += (c.hazard_level || '&mdash;') + ' | ' + (c.type || 'Unknown');
+        if (c.medical_emergency === 'YES') html += ' | MEDICAL';
+        html += '</div>';
+        html += '</div>';
+      });
+      list.innerHTML = html;
+    }
+
+    // ==================== RENDER ZONES ====================
+    function renderZones(zones) {
+      var tbody = document.getElementById('zones-tbody');
+
+      if (!zones || zones.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--text-secondary);">No zone data</td></tr>';
+        return;
+      }
+
+      var html = '';
+      zones.forEach(function(z) {
+        if (z.case_count === 0) return;
+
+        var statusClass = 'served';
+        var statusText = 'SERVED';
+        var unmet = z.unmet_demand || {};
+        var unmetCount = Object.keys(unmet).length;
+        if (unmetCount > 0) {
+          var alloc = z.allocation || {};
+          var allocCount = Object.keys(alloc).length;
+          if (allocCount > 0) { statusClass = 'partial'; statusText = 'PARTIAL'; }
+          else { statusClass = 'unserved'; statusText = 'UNSERVED'; }
+        }
+
+        html += '<tr>';
+        html += '<td><strong>' + z.zone_id + '</strong><br><span style="font-size:9px;color:var(--text-secondary);">' + (z.name || '') + '</span></td>';
+        html += '<td>' + z.case_count + '</td>';
+        html += '<td>' + z.critical_cases + '</td>';
+        html += '<td>' + z.high_priority_cases + '</td>';
+        html += '<td>' + Math.round(z.priority_demand) + '</td>';
+        html += '<td>' + (z.allocation.ndrf || 0) + '/' + (z.resource_demand.ndrf || 0) + '</td>';
+        html += '<td>' + (z.allocation.ambulance || 0) + '/' + (z.resource_demand.ambulance || 0) + '</td>';
+        html += '<td>' + (z.allocation.boat || 0) + '/' + (z.resource_demand.boat || 0) + '</td>';
+        html += '<td>' + (z.allocation.shelter || 0) + '/' + (z.resource_demand.shelter || 0) + '</td>';
+        html += '<td>' + (z.allocation.hospital || 0) + '/' + (z.resource_demand.hospital || 0) + '</td>';
+        html += '<td>' + (z.allocation.fire || 0) + '/' + (z.resource_demand.fire || 0) + '</td>';
+        html += '<td><span class="zone-status ' + statusClass + '">' + statusText + '</span></td>';
+        html += '</tr>';
+      });
+      tbody.innerHTML = html;
+    }
+
+    // ==================== RENDER ASSIGNMENTS ====================
+    function renderAssignments(assignments) {
+      var list = document.getElementById('assignments-list');
+
+      if (!assignments || assignments.length === 0) {
+        list.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);">No assignments yet</div>';
+        return;
+      }
+
+      var html = '';
+      assignments.forEach(function(a) {
+        html += '<div class="assignment-item">';
+        html += '<span class="assignment-resource">' + a.resource_id + '</span>';
+        html += '<span class="assignment-arrow">&rarr;</span>';
+        html += '<span class="assignment-zone">' + a.zone_id + '</span>';
+        html += '<span class="assignment-dist">' + (a.distance_km ? a.distance_km.toFixed(1) + ' km' : '') + '</span>';
+        html += '</div>';
+      });
+      list.innerHTML = html;
+    }
+
+    // ==================== RENDER MAP ====================
+    function renderMap(state) {
+      sosLayer.clearLayers();
+      zoneLayer.clearLayers();
+      resourceLayer.clearLayers();
+      assignmentLayer.clearLayers();
+
+      // Draw zones
+      if (state.zones) {
+        state.zones.forEach(function(z) {
+          if (z.case_count > 0 && z.center) {
+            var circle = L.circle([z.center.lat, z.center.lng], {
+              radius: 4000,
+              color: '#06b6d4',
+              fillColor: '#06b6d4',
+              fillOpacity: 0.08,
+              weight: 2,
+              dashArray: '5,5'
+            });
+            circle.bindPopup(
+              '<strong>' + z.zone_id + '</strong> (' + (z.name || '') + ')<br>' +
+              'Cases: ' + z.case_count + '<br>' +
+              'Critical: ' + z.critical_cases + ' | High: ' + z.high_priority_cases + '<br>' +
+              'Priority Demand: ' + Math.round(z.priority_demand) + '<br>' +
+              '<span style="color:#a855f7;font-size:10px;">PROTOTYPE ZONE</span>'
+            );
+            zoneLayer.addLayer(circle);
+          }
+        });
+      }
+
+      // Draw SOS incidents
+      if (state.cases) {
+        state.cases.forEach(function(c) {
+          var score = c.priority_score || 0;
+          var color = '#22c55e';
+          if (score >= 80) color = '#ef4444';
+          else if (score >= 60) color = '#f97316';
+          else if (score >= 40) color = '#eab308';
+
+          var marker = L.circleMarker([c.lat, c.lng], {
+            radius: 7,
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.8,
+            weight: 2
+          });
+          marker.bindPopup(
+            '<strong>' + c.incident_id + '</strong><br>' +
+            'Priority: ' + score + '/100<br>' +
+            'Type: ' + (c.type || 'Unknown') + '<br>' +
+            'Hazard: ' + (c.hazard_level || '&mdash;') + '<br>' +
+            'Medical: ' + (c.medical_emergency || 'NO') + '<br>' +
+            'Source: ' + (c.location_source === 'gps' ? '<span style="color:#22c55e;">GPS</span>' : '<span style="color:#f97316;">DEMO FALLBACK</span>')
+          );
+          marker.on('click', function() { selectCase(c.incident_id); });
+          sosLayer.addLayer(marker);
+        });
+      }
+
+      // Draw resources
+      if (state.resources) {
+        state.resources.forEach(function(r) {
+          var color = r.allocated ? '#3b82f6' : '#94a3b8';
+          // Fire resources get a distinct color
+          if (r.resource_type === 'fire') {
+            color = r.allocated ? '#f97316' : '#b45309';
+          }
+          var marker = L.circleMarker([r.lat, r.lng], {
+            radius: 4,
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.7,
+            weight: 1
+          });
+          var statusText = r.allocated ? 'ALLOCATED &rarr; ' + (r.assigned_zone || '') : 'AVAILABLE';
+          marker.bindPopup(
+            '<strong>' + r.resource_id + '</strong><br>' +
+            'Type: ' + (r.resource_type || '').toUpperCase() + '<br>' +
+            'Status: ' + statusText + '<br>' +
+            '<span style="color:#a855f7;font-size:10px;">PROTOTYPE LOCATION</span>'
+          );
+          resourceLayer.addLayer(marker);
+        });
+      }
+
+      // Draw assignment lines
+      if (state.assignments && state.resources) {
+        state.assignments.forEach(function(a) {
+          var res = state.resources.find(function(r) { return r.resource_id === a.resource_id; });
+          var zone = state.zones.find(function(z) { return z.zone_id === a.zone_id; });
+          if (res && zone && zone.center) {
+            var line = L.polyline(
+              [[res.lat, res.lng], [zone.center.lat, zone.center.lng]],
+              { color: '#06b6d4', weight: 2, dashArray: '4,4', opacity: 0.7 }
+            );
+            assignmentLayer.addLayer(line);
+          }
+        });
+      }
+    }
+
+    // ==================== CASE SELECTION & DETAIL ====================
+    function _format_si_row(label, value, suffix) {
+      suffix = suffix || '';
+      var displayValue = value;
+      if (value === undefined || value === null) {
+        displayValue = 'UNKNOWN';
+      } else if (typeof value === 'boolean') {
+        displayValue = value ? 'YES' : 'NO';
+      } else if (value === 'unknown') {
+        displayValue = 'UNKNOWN';
+      } else if (typeof value === 'string') {
+        displayValue = value.toUpperCase();
+      } else {
+        displayValue = value + suffix;
+      }
+      return '<div class="detail-row"><span class="label">' + label + ':</span><span class="value">' + displayValue + '</span></div>';
+    }
+
+    function selectCase(caseId) {
+      selectedCaseId = caseId;
+      renderCases(currentState.cases);
+
+      var c = currentState.cases.find(function(c) { return c.incident_id === caseId; });
+      if (!c) return;
+
+      // Find zone for this case
+      var zoneId = 'Unassigned';
+      var zoneName = '';
+      if (currentState.zones) {
+        currentState.zones.forEach(function(z) {
+          if (z.case_count > 0 && z.center) {
+            var dist = Math.sqrt(Math.pow(c.lat - z.center.lat, 2) + Math.pow(c.lng - z.center.lng, 2));
+            if (dist < 0.08) {
+              zoneId = z.zone_id;
+              zoneName = z.name || '';
+            }
+          }
+        });
+      }
+
+      var html = '';
+
+      // Structured Incident Section (extracted from natural language)
+      var si = c.structured_incident || {};
+      if (Object.keys(si).length > 0) {
+        html += '<div class="detail-section">';
+        html += '<div class="detail-section-title">Structured Incident <span class="data-tag deterministic">EXTRACTED</span></div>';
+        html += '<div class="detail-grid">';
+        html += _format_si_row('People', si.number_of_people);
+        html += _format_si_row('Children', si.children);
+        html += _format_si_row('Elderly', si.elderly);
+        html += _format_si_row('Pregnant', si.pregnant);
+        html += _format_si_row('Injury', si.injury);
+        html += _format_si_row('Trapped', si.trapped);
+        html += _format_si_row('Flood Depth', si.flood_depth_m, ' m');
+        html += _format_si_row('Fire', si.fire);
+        html += _format_si_row('Building Damage', si.building_damage);
+        html += _format_si_row('Communication', si.communication);
+        html += '</div>';
+        html += '</div>';
+      }
+
+      // Priority Score Section
+      html += '<div class="detail-section">';
+      html += '<div class="detail-section-title">Final Rescue Priority <span class="data-tag deterministic">DETERMINISTIC</span></div>';
+      html += '<div class="priority-score-display">';
+      html += '<div class="score-value" style="color:' + getScoreColor(c.priority_score) + ';">' + c.priority_score + '</div>';
+      html += '<div class="score-label">out of 100</div>';
+      html += '</div>';
+
+      // Priority Breakdown
+      if (c.priority_breakdown && c.priority_breakdown.components) {
+        var comps = c.priority_breakdown.components;
+        Object.keys(comps).forEach(function(key) {
+          var comp = comps[key];
+          var pct = (comp.contribution / comp.weight) * 100;
+          var barClass = key.toLowerCase().replace('_', '');
+          var labelText = key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
+          html += '<div class="priority-breakdown-bar">';
+          html += '<span class="pb-label">' + labelText + '</span>';
+          html += '<div class="pb-bar-container"><div class="pb-bar ' + barClass + '" style="width:' + pct + '%;"></div></div>';
+          html += '<span class="pb-value">' + comp.contribution + '</span>';
+          html += '</div>';
+          html += '<div class="pb-formula">' + (comp.weight * 100) + '% &times; ' + comp.score + ' = ' + comp.contribution + '</div>';
+        });
+      }
+      html += '</div>';
+
+      // Incident Details
+      html += '<div class="detail-section">';
+      html += '<div class="detail-section-title">Incident Details</div>';
+      html += '<div class="detail-grid">';
+      html += '<div class="detail-row"><span class="label">ID:</span><span class="value">' + (c.incident_id || '&mdash;') + '</span></div>';
+      html += '<div class="detail-row"><span class="label">Type:</span><span class="value">' + (c.type || '&mdash;') + '</span></div>';
+      html += '<div class="detail-row"><span class="label">Hazard:</span><span class="value">' + (c.hazard_level || '&mdash;') + '</span></div>';
+      html += '<div class="detail-row"><span class="label">People:</span><span class="value">' + (c.people_involved || '&mdash;') + '</span></div>';
+      html += '<div class="detail-row"><span class="label">Medical:</span><span class="value">' + (c.medical_emergency || 'NO') + '</span></div>';
+      html += '<div class="detail-row"><span class="label">Zone:</span><span class="value">' + zoneId + (zoneName ? ' (' + zoneName + ')' : '') + '</span></div>';
+      html += '</div>';
+      html += '<div style="margin-top:10px;font-size:11px;">';
+      html += 'Location: ' + (c.location_source === 'gps' ? '<span class="data-tag gps">GPS</span>' : '<span class="data-tag demo">DEMO FALLBACK</span>');
+      html += '</div>';
+      html += '</div>';
+
+      // ML Prediction Section
+      html += '<div class="detail-section">';
+      html += '<div class="detail-section-title">ML Prediction <span class="data-tag ml">PREDICTIVE / SUPPLEMENTARY</span></div>';
+      if (c.ml_prediction && c.ml_prediction.available) {
+        html += '<div class="ml-prediction-box">';
+        html += '<div class="ml-title">Machine Learning Triage Prediction</div>';
+        html += '<div class="ml-row"><span class="ml-label">Incident Type:</span><span class="ml-val">' + (c.ml_prediction.incident_type || '&mdash;') + '</span></div>';
+        html += '<div class="ml-row"><span class="ml-label">Severity:</span><span class="ml-val">' + (c.ml_prediction.severity || '&mdash;') + '</span></div>';
+        html += '<div class="ml-row"><span class="ml-label">Medical Urgency:</span><span class="ml-val">' + (c.ml_prediction.medical_urgency || '&mdash;') + '</span></div>';
+        if (c.ml_prediction.confidence) {
+          html += '<div class="ml-row"><span class="ml-label">Confidence (Incident):</span><span class="ml-val">' + Math.round((c.ml_prediction.confidence.incident_type || 0) * 100) + '%</span></div>';
+          html += '<div class="ml-row"><span class="ml-label">Confidence (Severity):</span><span class="ml-val">' + Math.round((c.ml_prediction.confidence.severity || 0) * 100) + '%</span></div>';
+          html += '<div class="ml-row"><span class="ml-label">Confidence (Medical):</span><span class="ml-val">' + Math.round((c.ml_prediction.confidence.medical_urgency || 0) * 100) + '%</span></div>';
+        }
+        html += '<div class="ml-disclaimer">ML is supplementary. Deterministic priority is authoritative for dispatch decisions.</div>';
+        html += '</div>';
+      } else {
+        html += '<div class="ml-unavailable">ML prediction unavailable. Deterministic priority engine is active.</div>';
+      }
+      html += '</div>';
+
+      // Allocation Section
+      html += '<div class="detail-section">';
+      html += '<div class="detail-section-title">Resource Allocation <span class="data-tag optimization">OPTIMIZATION</span></div>';
+      if (currentState.assignments && currentState.assignments.length > 0) {
+        var caseAssignments = currentState.assignments.filter(function(a) {
+          return a.zone_id === zoneId;
+        });
+        if (caseAssignments.length > 0) {
+          caseAssignments.forEach(function(a) {
+            html += '<div style="padding:6px 0;font-size:12px;border-bottom:1px solid var(--border);">';
+            html += '<strong style="color:var(--accent-blue);">' + a.resource_id + '</strong> &rarr; ' + a.zone_id;
+            if (a.distance_km) html += ' <span style="color:var(--text-secondary);font-size:10px;">(' + a.distance_km.toFixed(1) + ' km straight-line)</span>';
+            html += '</div>';
+          });
+        } else {
+          html += '<div style="font-size:12px;color:var(--text-secondary);">Resources allocated at zone level. See zone details below.</div>';
+        }
+      } else {
+        html += '<div style="font-size:12px;color:var(--text-secondary);">No allocation data available.</div>';
+      }
+      html += '</div>';
+
+      document.getElementById('detail-title').innerText = 'Incident: ' + c.incident_id;
+      document.getElementById('detail-content').innerHTML = html;
+      document.getElementById('detail-overlay').classList.add('active');
+    }
+
+    function getScoreColor(score) {
+      if (score >= 80) return '#ef4444';
+      if (score >= 60) return '#f97316';
+      if (score >= 40) return '#eab308';
+      return '#22c55e';
+    }
+
+    function closeDetail(event) {
+      if (!event || event.target === document.getElementById('detail-overlay') || event.target.classList.contains('detail-close')) {
+        document.getElementById('detail-overlay').classList.remove('active');
+      }
+    }
+
+    // ==================== INITIALIZATION ====================
+    window.onload = initMap;
+</script>
+</body>
+</html>
