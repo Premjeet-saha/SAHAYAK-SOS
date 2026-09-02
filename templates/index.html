@@ -744,6 +744,10 @@ var currentType = 'text';
 var payloadData = '';
 var refreshInterval;
 var isRefreshing = false;
+// Offline emergency SMS destination.
+// Replace this with your team's emergency/control-center phone number.
+var EMERGENCY_SMS_NUMBER = 'YOUR_EMERGENCY_NUMBER';
+
 
 // ==================== MAP INITIALIZATION ====================
 function initMap() {
@@ -828,45 +832,129 @@ function getLocationAndSend() {
     payloadData = document.getElementById('user-input').value;
   }
 
-  var fallbackLat = 20.296 + (Math.random() - 0.5) * 0.02;
-  var fallbackLng = 85.824 + (Math.random() - 0.5) * 0.02;
+  if (!payloadData || !String(payloadData).trim()) {
+    alert('Please describe the emergency first.');
+    return;
+  }
 
+  document.getElementById('location-source-display').innerText =
+    'Location: acquiring GNSS/device location...';
+
+  // Browser geolocation is the web-side location API. On a phone,
+  // the operating system may use GNSS when satellite positioning is available.
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
-      function(pos) { sendSOS(pos.coords.latitude, pos.coords.longitude, 'gps'); },
-      function() { sendSOS(fallbackLat, fallbackLng, 'demo_fallback'); },
-      { timeout: 3000 }
+      function(pos) {
+        sendSOS(
+          pos.coords.latitude,
+          pos.coords.longitude,
+          'gnss'
+        );
+      },
+      function(error) {
+        console.warn('Location unavailable:', error);
+        handleNoLocation();
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
     );
   } else {
-    sendSOS(fallbackLat, fallbackLng, 'demo_fallback');
+    handleNoLocation();
   }
 }
 
+function handleNoLocation() {
+  document.getElementById('location-source-display').innerText =
+    'Location unavailable — SMS fallback needs coordinates.';
+  alert(
+    'Could not obtain device location. ' +
+    'For a real emergency, please enable Location/GNSS and try again.'
+  );
+}
+
+function buildEmergencySms(lat, lng) {
+  var message =
+    'SAHAYAK SOS\\n' +
+    'Emergency assistance required.\\n' +
+    'Location: ' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '\\n' +
+    'Input: ' + String(payloadData).slice(0, 500) + '\\n' +
+    'Time: ' + new Date().toISOString();
+
+  return message;
+}
+
+function openSmsFallback(lat, lng) {
+  var message = buildEmergencySms(lat, lng);
+
+  document.getElementById('location-source-display').innerText =
+    'GNSS location captured — opening SMS...';
+
+  // A browser cannot silently send SMS. This opens the phone's SMS composer
+  // with the SOS already filled in; the user confirms Send.
+  var smsUrl =
+    'sms:' + encodeURIComponent(EMERGENCY_SMS_NUMBER) +
+    '?body=' + encodeURIComponent(message);
+
+  window.location.href = smsUrl;
+}
+
 function sendSOS(lat, lng, locationSource) {
-  document.getElementById('location-source-display').innerText = 'Location: ' + (locationSource === 'gps' ? 'GPS' : 'Demo Fallback');
+  document.getElementById('location-source-display').innerText =
+    'Location: GNSS/device location captured';
+
+  var offlineId =
+    'OFF-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+
+  var sosPayload = {
+    client_incident_id: offlineId,
+    lat: lat,
+    lng: lng,
+    raw_input: payloadData,
+    type: currentType,
+    location_source: locationSource,
+    client_timestamp: new Date().toISOString()
+  };
+
+  // Normal path: use the existing Flask backend when reachable.
+  // Offline path: use cellular SMS instead of fetch().
+  if (!navigator.onLine) {
+    openSmsFallback(lat, lng);
+    return;
+  }
 
   fetch('/report-emergency', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      lat: lat,
-      lng: lng,
-      raw_input: payloadData,
-      type: currentType,
-      location_source: locationSource
-    })
+    body: JSON.stringify(sosPayload)
   })
-  .then(function(res) { return res.json(); })
+  .then(function(res) {
+    if (!res.ok) throw new Error('Backend returned HTTP ' + res.status);
+    return res.json();
+  })
   .then(function(resp) {
     if (resp.status === 'Success') {
+      document.getElementById('location-source-display').innerText =
+        'Location: GNSS | SOS delivered to SAHAYAK backend';
+
       document.getElementById('user-input').value = '';
       document.getElementById('image-preview').style.display = 'none';
       document.getElementById('transcription-box').style.display = 'none';
       payloadData = '';
       refreshCommandCenter();
+    } else {
+      throw new Error('Backend rejected SOS');
     }
   })
-  .catch(function(err) { console.error('SOS send error:', err); });
+  .catch(function(err) {
+    console.error('SOS send error:', err);
+
+    // Internet may have disappeared after navigator.onLine said "online".
+    // Fall back to SMS.
+    openSmsFallback(lat, lng);
+  });
 }
 
 // ==================== COMMAND CENTER REFRESH ====================
